@@ -2,18 +2,19 @@
   "name": "BIST Portföy",
   "short_name": "Portföy",
   "description": "Kişisel BIST Portföy Yönetim Uygulaması",
-  "start_url": "/",
+  "start_url": "/bist-portfolyo/",
+  "scope": "/bist-portfolyo/",
   "display": "standalone",
   "background_color": "#0f1117",
   "theme_color": "#1e2330",
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "/bist-portfolyo/icon-192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "icon-512.png",
+      "src": "/bist-portfolyo/icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
