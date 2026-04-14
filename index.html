@@ -7,7 +7,16 @@
     <link rel="manifest" href="/bist-portfolyo/manifest.json" />
     <meta name="theme-color" content="#1e2330" />
     <title>bist-portfolyo</title>
-    <script type="module" crossorigin src="/bist-portfolyo/assets/index-C6768OOR.js"></script>
+    <script>
+      (function(){
+        var redirect = sessionStorage.redirect;
+        delete sessionStorage.redirect;
+        if (redirect && redirect !== location.href) {
+          history.replaceState(null, null, redirect);
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/bist-portfolyo/assets/index-BqmNOSvs.js"></script>
     <link rel="stylesheet" crossorigin href="/bist-portfolyo/assets/index-CTiidMTq.css">
   </head>
   <body>
