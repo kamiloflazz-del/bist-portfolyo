@@ -148,3 +148,5 @@ body {
 @media (max-width: 640px) {
   .g2 { grid-template-columns: 1fr; }
 }
+
+.uyari-oran { background: #4c1d9533; border-left: 3px solid #a855f7; color: #d8b4fe; }
