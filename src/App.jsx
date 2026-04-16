@@ -14,7 +14,8 @@ import {
   halkaArzOku, halkaArzYaz,
   takipOku,   takipYaz,
   portfoyDinle, nakitDinle,
-  bilancOku, bilancYaz
+  bilancOku, bilancYaz,
+  alarmGecmisiOku, alarmGecmisiYaz
 } from "./veri";
 
 
@@ -173,10 +174,22 @@ function Dashboard({ hisseler, nakit, onHisseClick, sonGuncelleme, takipListe })
   const coreYuzde    = ((coreDeger / toplamVarlik) * 100).toFixed(0);
 
   const tumUyarilar = hisseler.flatMap(h => uyariKontrol(h, toplamVarlik));
-  const takipAlarmlari = (takipListe || []).filter(h =>
-    h.alimSeviyesi && h.guncel &&
-    parseFloat(h.guncel) <= parseFloat(h.alimSeviyesi)
-  );
+  const takipAlarmlari = (takipListe || []).flatMap(h => {
+    const guncel = parseFloat(h.guncel);
+    if (!guncel || !h.alarmlar) return [];
+    const { direncAl, destekAl, destekSat, direncSat } = h.alarmlar;
+    const alarml = [];
+    if (direncAl?.aktif && direncAl?.fiyat && guncel >= parseFloat(direncAl.fiyat))
+      alarml.push({ ...h, alarmTip: "📈 Direnç AL", alarmFiyat: direncAl.fiyat, renk: "#22c55e" });
+    if (destekAl?.aktif && destekAl?.fiyat && guncel <= parseFloat(destekAl.fiyat))
+      alarml.push({ ...h, alarmTip: "💙 Destek AL", alarmFiyat: destekAl.fiyat, renk: "#38bdf8" });
+    if (destekSat?.aktif && destekSat?.fiyat && guncel <= parseFloat(destekSat.fiyat))
+      alarml.push({ ...h, alarmTip: "📉 Destek SAT", alarmFiyat: destekSat.fiyat, renk: "#ef4444" });
+    if (direncSat?.aktif && direncSat?.fiyat && guncel >= parseFloat(direncSat.fiyat))
+      alarml.push({ ...h, alarmTip: "⚠️ Direnç SAT", alarmFiyat: direncSat.fiyat, renk: "#f59e0b" });
+    return alarml;
+  });
+
   const acilSatlar   = hisseler.filter(h => h.aksiyon === "SAT");
 
   return (
@@ -231,20 +244,20 @@ function Dashboard({ hisseler, nakit, onHisseClick, sonGuncelleme, takipListe })
 
       {/* Takip Alarmları */}
       {takipAlarmlari.length > 0 && (
-        <div className="panel" style={{ marginBottom:"1rem", borderColor:"#22c55e", borderWidth:"2px" }}>
-          <h3 className="panel-baslik" style={{ color:"#22c55e" }}>
-            🟢 TAKİP — ALIM SEVİYESİNE ULAŞTI ({takipAlarmlari.length} hisse)
+        <div className="panel" style={{ marginBottom:"1rem", borderColor:"#f59e0b", borderWidth:"2px" }}>
+          <h3 className="panel-baslik" style={{ color:"#f59e0b" }}>
+            🔔 TAKİP ALARMLARI ({takipAlarmlari.length})
           </h3>
           {takipAlarmlari.map((h, i) => (
             <div key={i} className="acil-satir">
               <div>
                 <b style={{ color:"#f1f5f9" }}>{h.id}</b>
                 <span style={{ color:"#94a3b8", marginLeft:"8px", fontSize:"0.82rem" }}>{h.ad}</span>
+                <span style={{ marginLeft:"8px", fontWeight:600, color: h.renk }}>{h.alarmTip}</span>
               </div>
               <div style={{ display:"flex", gap:"12px", fontSize:"0.82rem" }}>
-                <span>Güncel: <b className="yesil">{h.guncel} TL</b></span>
-                <span>Alım Seviyesi: <b style={{ color:"#22c55e" }}>{h.alimSeviyesi} TL</b></span>
-                {h.hedef && <span>Hedef: <b style={{ color:"#38bdf8" }}>{h.hedef} TL</b></span>}
+                <span>Güncel: <b style={{ color:"#f1f5f9" }}>{h.guncel} TL</b></span>
+                <span>Alarm: <b style={{ color: h.renk }}>{h.alarmFiyat} TL</b></span>
               </div>
             </div>
           ))}
@@ -1154,6 +1167,12 @@ export default function App() {
     takipOku().then(setTakipListe);
   }, []);
 
+  const [alarmGecmisi, setAlarmGecmisi] = useState([]);
+
+  useEffect(() => {
+    alarmGecmisiOku().then(setAlarmGecmisi);
+  }, []);
+
   // Firebase'den veri yükle
   useEffect(() => {
     let ilkYukleme = true;
@@ -1226,7 +1245,7 @@ export default function App() {
       console.log("Takip liste:", takipListe);
       console.log("Veri:", veri);
 
-      // Takip listesini de güncelle
+      // Takip listesini de güncelle ve alarm kontrol et
       setTakipListe(prev => {
         if (!prev || prev.length === 0) return prev;
         const yeniTakip = prev.map(h => {
@@ -1240,6 +1259,53 @@ export default function App() {
           return h;
         });
         takipYaz(yeniTakip);
+
+        // Alarm geçmişi kontrol
+        const guncelZaman = Date.now();
+        const yeniAlarmlar = [];
+
+        yeniTakip.forEach(h => {
+          const guncel = parseFloat(h.guncel);
+          if (!guncel || !h.alarmlar) return;
+          const { direncAl, destekAl, destekSat, direncSat } = h.alarmlar;
+
+          const kontrolEt = (alarm, tip, tetiklendi) => {
+            if (!alarm?.aktif || !alarm?.fiyat || !tetiklendi) return;
+            // Son 1 saatte aynı alarm var mı?
+            const sonBirSaat = guncelZaman - 60 * 60 * 1000;
+            const mevcutVar = alarmGecmisi.some(a =>
+              a.hisseId === h.id && a.tip === tip &&
+              new Date(a.zaman).getTime() > sonBirSaat
+            );
+            if (!mevcutVar) {
+              yeniAlarmlar.push({
+                id: `${h.id}_${tip}_${guncelZaman}`,
+                hisseId: h.id,
+                hisseAd: h.ad,
+                tip,
+                alarmFiyat: alarm.fiyat,
+                guncelFiyat: h.guncel,
+                not: alarm.not || "",
+                zaman: new Date().toISOString(),
+                okundu: false,
+              });
+            }
+          };
+
+          kontrolEt(direncAl,   "direncAl",  guncel >= parseFloat(direncAl?.fiyat));
+          kontrolEt(destekAl,   "destekAl",  guncel <= parseFloat(destekAl?.fiyat));
+          kontrolEt(destekSat,  "destekSat", guncel <= parseFloat(destekSat?.fiyat));
+          kontrolEt(direncSat,  "direncSat", guncel >= parseFloat(direncSat?.fiyat));
+        });
+
+        if (yeniAlarmlar.length > 0) {
+          setAlarmGecmisi(prev => {
+            const guncellenmis = [...yeniAlarmlar, ...prev].slice(0, 200);
+            alarmGecmisiYaz(guncellenmis);
+            return guncellenmis;
+          });
+        }
+
         return yeniTakip;
       });
 
@@ -1358,6 +1424,16 @@ export default function App() {
           <TakipListesi
             liste={takipListe}
             setListe={(yeni) => { setTakipListe(yeni); takipYaz(yeni); }}
+            alarmGecmisi={alarmGecmisi}
+            onAlarmSil={(id) => {
+              const yeni = alarmGecmisi.filter(a => a.id !== id);
+              setAlarmGecmisi(yeni);
+              alarmGecmisiYaz(yeni);
+            }}
+            onTumAlarmSil={() => {
+              setAlarmGecmisi([]);
+              alarmGecmisiYaz([]);
+            }}
           />
         )}
         
@@ -2364,14 +2440,19 @@ function SonIslemler() {
 }
 
 // ─── TAKİP LİSTESİ ───────────────────────────────────────────────────────
-function TakipListesi({ liste, setListe }) {
+function TakipListesi({ liste, setListe, alarmGecmisi = [], onAlarmSil, onTumAlarmSil }) {
   const [formAcik, setFormAcik] = useState(false);
   const [duzenlenen, setDuzenlenen] = useState(null);
 
   const bosForm = {
-    id: "", ad: "", guncel: "", alimSeviyesi: "",
-    hedef: "", stop: "", kategori: "CORE",
-    tez: "", not: "", sektör: ""
+    id: "", ad: "", guncel: "", sektör: "", kategori: "CORE",
+    tez: "", not: "",
+    alarmlar: {
+      direncAl:   { fiyat: "", aktif: true, not: "" },
+      destekAl:   { fiyat: "", aktif: true, not: "" },
+      destekSat:  { fiyat: "", aktif: true, not: "" },
+      direncSat:  { fiyat: "", aktif: true, not: "" },
+    }
   };
   const [form, setForm] = useState({ ...bosForm });
 
@@ -2398,15 +2479,53 @@ function TakipListesi({ liste, setListe }) {
   }
 
   function duzenle(idx) {
-    setForm({ ...liste[idx] });
+    const h = liste[idx];
+    setForm({
+      ...bosForm,
+      ...h,
+      alarmlar: {
+        direncAl:   { fiyat: "", aktif: true, not: "", ...h.alarmlar?.direncAl },
+        destekAl:   { fiyat: "", aktif: true, not: "", ...h.alarmlar?.destekAl },
+        destekSat:  { fiyat: "", aktif: true, not: "", ...h.alarmlar?.destekSat },
+        direncSat:  { fiyat: "", aktif: true, not: "", ...h.alarmlar?.direncSat },
+      }
+    });
     setDuzenlenen(idx);
     setFormAcik(true);
   }
 
-  function alarmVar(h) {
-    if (!h.alimSeviyesi || !h.guncel) return false;
-    return parseFloat(h.guncel) <= parseFloat(h.alimSeviyesi);
+  function alarmGuncelle(key, alan, deger) {
+    setForm(prev => ({
+      ...prev,
+      alarmlar: {
+        ...prev.alarmlar,
+        [key]: { ...prev.alarmlar?.[key], [alan]: deger }
+      }
+    }));
   }
+
+  function alarmKontrol(h) {
+    const alarml = [];
+    const guncel = parseFloat(h.guncel);
+    if (!guncel || !h.alarmlar) return alarml;
+    const { direncAl, destekAl, destekSat, direncSat } = h.alarmlar;
+    if (direncAl?.aktif && direncAl?.fiyat && guncel >= parseFloat(direncAl.fiyat))
+      alarml.push({ tip: "direncAl", mesaj: `${h.id} direnç kırıldı — AL sinyali (${direncAl.fiyat} TL)`, renk: "#22c55e" });
+    if (destekAl?.aktif && destekAl?.fiyat && guncel <= parseFloat(destekAl.fiyat))
+      alarml.push({ tip: "destekAl", mesaj: `${h.id} destek seviyesinde — AL fırsatı (${destekAl.fiyat} TL)`, renk: "#38bdf8" });
+    if (destekSat?.aktif && destekSat?.fiyat && guncel <= parseFloat(destekSat.fiyat))
+      alarml.push({ tip: "destekSat", mesaj: `${h.id} destek kırıldı — SAT sinyali (${destekSat.fiyat} TL)`, renk: "#ef4444" });
+    if (direncSat?.aktif && direncSat?.fiyat && guncel >= parseFloat(direncSat.fiyat))
+      alarml.push({ tip: "direncSat", mesaj: `${h.id} dirençte zorlanıyor — SAT değerlendir (${direncSat.fiyat} TL)`, renk: "#f59e0b" });
+    return alarml;
+  }
+
+  const ALARM_TANIMLARI = [
+    { key: "direncAl",  label: "📈 Direnç AL",  aciklama: "Fiyat bu seviyeyi yukarı kırarsa AL sinyali",   renk: "#22c55e" },
+    { key: "destekAl",  label: "💙 Destek AL",  aciklama: "Fiyat bu seviyeye gelince AL fırsatı",           renk: "#38bdf8" },
+    { key: "destekSat", label: "📉 Destek SAT", aciklama: "Fiyat bu seviyeyi aşağı kırarsa SAT sinyali",   renk: "#ef4444" },
+    { key: "direncSat", label: "⚠️ Direnç SAT", aciklama: "Fiyat bu seviyeye gelince SAT değerlendir",     renk: "#f59e0b" },
+  ];
 
   return (
     <div>
@@ -2418,17 +2537,12 @@ function TakipListesi({ liste, setListe }) {
       </div>
 
       {/* Alarm Özeti */}
-      {liste.filter(alarmVar).length > 0 && (
-        <div className="panel" style={{ marginBottom:"1rem", borderColor:"#22c55e" }}>
-          <h3 className="panel-baslik" style={{ color:"#22c55e" }}>
-            🟢 Alım Seviyesine Ulaşan Hisseler ({liste.filter(alarmVar).length})
-          </h3>
-          {liste.filter(alarmVar).map((h, i) => (
+      {liste.some(h => alarmKontrol(h).length > 0) && (
+        <div className="panel" style={{ marginBottom:"1rem", borderColor:"#f59e0b" }}>
+          <h3 className="panel-baslik" style={{ color:"#f59e0b" }}>🔔 Aktif Alarmlar</h3>
+          {liste.flatMap(h => alarmKontrol(h)).map((a, i) => (
             <div key={i} className="acil-satir">
-              <span><b>{h.id}</b> — {h.ad}</span>
-              <span className="yesil">
-                Güncel: {h.guncel} TL ≤ Alım: {h.alimSeviyesi} TL
-              </span>
+              <span style={{ color: a.renk, fontWeight: 600 }}>{a.mesaj}</span>
             </div>
           ))}
         </div>
@@ -2440,6 +2554,8 @@ function TakipListesi({ liste, setListe }) {
           <h3 className="panel-baslik">
             {duzenlenen !== null ? "Kaydı Düzenle" : "Yeni Takip Hissesi"}
           </h3>
+
+          {/* Temel Bilgiler */}
           <div className="form-grid" style={{ marginBottom:"1rem" }}>
             <label className="form-label">
               Sembol *
@@ -2460,25 +2576,6 @@ function TakipListesi({ liste, setListe }) {
                 onChange={e => setForm({ ...form, guncel: e.target.value })} />
             </label>
             <label className="form-label">
-              Alım Seviyesi (Alarm)
-              <input className="input" type="number" step="0.01"
-                placeholder="Bu fiyata gelince alarm"
-                value={form.alimSeviyesi}
-                onChange={e => setForm({ ...form, alimSeviyesi: e.target.value })} />
-            </label>
-            <label className="form-label">
-              Hedef Fiyat
-              <input className="input" type="number" step="0.01"
-                value={form.hedef}
-                onChange={e => setForm({ ...form, hedef: e.target.value })} />
-            </label>
-            <label className="form-label">
-              Stop-Loss
-              <input className="input" type="number" step="0.01"
-                value={form.stop}
-                onChange={e => setForm({ ...form, stop: e.target.value })} />
-            </label>
-            <label className="form-label">
               Sektör
               <input className="input" type="text" placeholder="örn: Enerji"
                 value={form.sektör}
@@ -2497,6 +2594,36 @@ function TakipListesi({ liste, setListe }) {
               </select>
             </label>
           </div>
+
+          {/* Alarm Seviyeleri */}
+          <h3 className="panel-baslik" style={{ marginBottom:"0.75rem" }}>🔔 Alarm Seviyeleri</h3>
+          <div style={{ display:"flex", flexDirection:"column", gap:"0.75rem", marginBottom:"1rem" }}>
+            {ALARM_TANIMLARI.map(({ key, label, aciklama, renk }) => (
+              <div key={key} style={{ background:"#0f1117", border:`1px solid #2d3748`, borderRadius:"8px", padding:"10px 12px" }}>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:"4px" }}>
+                  <span style={{ fontWeight:600, color: renk, fontSize:"0.85rem" }}>{label}</span>
+                  <label style={{ display:"flex", alignItems:"center", gap:"6px", fontSize:"0.78rem", color:"#94a3b8", cursor:"pointer" }}>
+                    <input type="checkbox"
+                      checked={form.alarmlar?.[key]?.aktif ?? true}
+                      onChange={e => alarmGuncelle(key, "aktif", e.target.checked)} />
+                    Aktif
+                  </label>
+                </div>
+                <div style={{ fontSize:"0.73rem", color:"#64748b", marginBottom:"6px" }}>{aciklama}</div>
+                <div style={{ display:"flex", gap:"8px" }}>
+                  <input className="input" type="number" step="0.01" placeholder="Fiyat (TL)"
+                    style={{ width:"140px" }}
+                    value={form.alarmlar?.[key]?.fiyat || ""}
+                    onChange={e => alarmGuncelle(key, "fiyat", e.target.value)} />
+                  <input className="input" type="text" placeholder="Not (opsiyonel)"
+                    value={form.alarmlar?.[key]?.not || ""}
+                    onChange={e => alarmGuncelle(key, "not", e.target.value)} />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Tez ve Not */}
           <label className="form-label" style={{ display:"block", marginBottom:"0.75rem" }}>
             Yatırım Tezi
             <textarea className="input-alan" rows={3}
@@ -2509,6 +2636,7 @@ function TakipListesi({ liste, setListe }) {
               value={form.not}
               onChange={e => setForm({ ...form, not: e.target.value })} />
           </label>
+
           <div className="btn-grup">
             <button className="btn btn-yesil" onClick={kaydet}>✓ Kaydet</button>
             <button className="btn btn-gri" onClick={() => { setFormAcik(false); setDuzenlenen(null); }}>İptal</button>
@@ -2516,39 +2644,49 @@ function TakipListesi({ liste, setListe }) {
         </div>
       )}
 
-      {/* Liste */}
+      {/* Boş Liste */}
       {liste.length === 0 && !formAcik && (
         <div className="panel" style={{ textAlign:"center", color:"#64748b", padding:"2rem" }}>
           Henüz takip listesi yok. "+ Hisse Ekle" ile başla.
         </div>
       )}
 
+      {/* Hisse Kartları */}
       {liste.map((h, idx) => {
-        const alarm = alarmVar(h);
+        const alarmlar = alarmKontrol(h);
+        const alarm = alarmlar.length > 0;
         const potansiyel = h.hedef && h.guncel
           ? (((parseFloat(h.hedef) - parseFloat(h.guncel)) / parseFloat(h.guncel)) * 100).toFixed(1)
           : null;
+
         return (
-          <div key={idx} className="panel" style={{ marginBottom:"0.75rem", borderColor: alarm ? "#22c55e" : undefined }}>
+          <div key={idx} className="panel" style={{ marginBottom:"0.75rem", borderColor: alarm ? "#f59e0b" : undefined }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
               <div style={{ flex:1 }}>
-                <div style={{ display:"flex", alignItems:"center", gap:"0.5rem", marginBottom:"4px", flexWrap:"wrap" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:"0.5rem", marginBottom:"6px", flexWrap:"wrap" }}>
                   <b style={{ fontSize:"1rem" }}>{h.id}</b>
                   <span style={{ color:"#94a3b8", fontSize:"0.85rem" }}>{h.ad}</span>
                   <span className="kat-badge" style={{ background: kategoriRenk(h.kategori) }}>
                     {h.kategori}
                   </span>
-                  {alarm && (
-                    <span className="kat-badge" style={{ background:"#15803d" }}>
-                      🟢 ALIM SEVİYESİ
+                  {alarmlar.map((a, i) => (
+                    <span key={i} className="kat-badge" style={{
+                      background: a.renk === "#22c55e" ? "#15803d"
+                        : a.renk === "#38bdf8" ? "#0369a1"
+                        : a.renk === "#ef4444" ? "#991b1b"
+                        : "#92400e"
+                    }}>
+                      {a.tip === "direncAl"  && "📈 DİRENÇ AL"}
+                      {a.tip === "destekAl"  && "💙 DESTEK AL"}
+                      {a.tip === "destekSat" && "📉 DESTEK SAT"}
+                      {a.tip === "direncSat" && "⚠️ DİRENÇ SAT"}
                     </span>
-                  )}
+                  ))}
                 </div>
+
                 <div style={{ display:"flex", gap:"1rem", flexWrap:"wrap", fontSize:"0.82rem", color:"#64748b" }}>
                   {h.guncel && <span>Güncel: <b style={{ color:"#f1f5f9" }}>{h.guncel} TL</b></span>}
-                  {h.alimSeviyesi && <span>Alım: <b style={{ color:"#22c55e" }}>{h.alimSeviyesi} TL</b></span>}
-                  {h.hedef && <span>Hedef: <b style={{ color:"#38bdf8" }}>{h.hedef} TL</b></span>}
-                  {h.stop && <span>Stop: <b style={{ color:"#ef4444" }}>{h.stop} TL</b></span>}
+                  {h.hedef  && <span>Hedef: <b style={{ color:"#38bdf8" }}>{h.hedef} TL</b></span>}
                   {potansiyel && (
                     <span>Potansiyel: <b className={parseFloat(potansiyel) >= 0 ? "yesil" : "kirmizi"}>
                       {parseFloat(potansiyel) >= 0 ? "+" : ""}{potansiyel}%
@@ -2556,26 +2694,77 @@ function TakipListesi({ liste, setListe }) {
                   )}
                   {h.sektör && <span>Sektör: {h.sektör}</span>}
                 </div>
+
+                {/* Aktif Alarmlar Detay */}
+                {h.alarmlar && (
+                  <div style={{ marginTop:"6px", display:"flex", flexWrap:"wrap", gap:"6px" }}>
+                    {ALARM_TANIMLARI.filter(a => h.alarmlar[a.key]?.fiyat && h.alarmlar[a.key]?.aktif).map(a => (
+                      <span key={a.key} style={{ fontSize:"0.75rem", color: a.renk, background:"#0f1117", border:`1px solid ${a.renk}33`, borderRadius:"4px", padding:"2px 7px" }}>
+                        {a.label}: {h.alarmlar[a.key].fiyat} TL
+                        {h.alarmlar[a.key].not && ` — ${h.alarmlar[a.key].not}`}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
                 {h.tez && (
                   <p style={{ marginTop:"6px", fontSize:"0.82rem", color:"#94a3b8", lineHeight:"1.5" }}>
                     {h.tez}
                   </p>
                 )}
               </div>
+
               <div style={{ display:"flex", gap:"6px", marginLeft:"1rem" }}>
                 <button onClick={() => duzenle(idx)}
-                  style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:"0.9rem" }}>
-                  ✏️
-                </button>
+                  style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:"0.9rem" }}>✏️</button>
                 <button onClick={() => sil(idx)}
-                  style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:"0.9rem" }}>
-                  🗑
-                </button>
+                  style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:"0.9rem" }}>🗑</button>
               </div>
             </div>
           </div>
         );
       })}
+      {/* Alarm Geçmişi */}
+      {alarmGecmisi.length > 0 && (
+        <div className="panel" style={{ marginTop:"1.5rem" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"0.75rem" }}>
+            <h3 className="panel-baslik" style={{ margin:0 }}>
+              📋 Alarm Geçmişi ({alarmGecmisi.length})
+            </h3>
+            <button onClick={onTumAlarmSil}
+              style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:"0.78rem" }}>
+              Tümünü Temizle
+            </button>
+          </div>
+          {alarmGecmisi.map(a => {
+            const renkler = { direncAl:"#22c55e", destekAl:"#38bdf8", destekSat:"#ef4444", direncSat:"#f59e0b" };
+            const etiketler = { direncAl:"📈 Direnç AL", destekAl:"💙 Destek AL", destekSat:"📉 Destek SAT", direncSat:"⚠️ Direnç SAT" };
+            const renk = renkler[a.tip] || "#94a3b8";
+            return (
+              <div key={a.id} style={{
+                display:"flex", justifyContent:"space-between", alignItems:"center",
+                padding:"0.5rem 0", borderBottom:"1px solid #1a2035", fontSize:"0.82rem"
+              }}>
+                <div style={{ flex:1 }}>
+                  <span style={{ fontWeight:700, color:"#f1f5f9", marginRight:"8px" }}>{a.hisseId}</span>
+                  <span style={{ color: renk, fontWeight:600, marginRight:"8px" }}>{etiketler[a.tip]}</span>
+                  <span style={{ color:"#64748b" }}>
+                    Alarm: {a.alarmFiyat} TL → Güncel: {a.guncelFiyat} TL
+                  </span>
+                  {a.not && <span style={{ color:"#64748b", marginLeft:"8px" }}>— {a.not}</span>}
+                  <div style={{ color:"#475569", fontSize:"0.75rem", marginTop:"2px" }}>
+                    {new Date(a.zaman).toLocaleString("tr-TR")}
+                  </div>
+                </div>
+                <button onClick={() => onAlarmSil(a.id)}
+                  style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", marginLeft:"8px" }}>
+                  ✕
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -104,3 +104,14 @@ export async function bilancYaz(tarihler) {
   const ref = doc(db, "bilanc", KULLANICI_ID);
   await setDoc(ref, { tarihler: temizle(tarihler) });
 }
+
+export async function alarmGecmisiOku() {
+  const ref = doc(db, "alarmGecmisi", KULLANICI_ID);
+  const snap = await getDoc(ref);
+  return snap.exists() ? snap.data().liste : [];
+}
+
+export async function alarmGecmisiYaz(liste) {
+  const ref = doc(db, "alarmGecmisi", KULLANICI_ID);
+  await setDoc(ref, { liste: temizle(liste) });
+}
