@@ -126,3 +126,14 @@ export async function snapshotYaz(liste) {
   const ref = doc(db, "snapshot", KULLANICI_ID);
   await setDoc(ref, { liste: temizle(liste) });
 }
+
+export async function arsivOku() {
+  const ref = doc(db, "arsiv", KULLANICI_ID);
+  const snap = await getDoc(ref);
+  return snap.exists() ? snap.data().liste : [];
+}
+
+export async function arsivYaz(liste) {
+  const ref = doc(db, "arsiv", KULLANICI_ID);
+  await setDoc(ref, { liste: temizle(liste) });
+}

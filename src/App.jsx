@@ -16,7 +16,8 @@ import {
   portfoyDinle, nakitDinle,
   bilancOku, bilancYaz,
   alarmGecmisiOku, alarmGecmisiYaz,
-  snapshotOku, snapshotYaz
+  snapshotOku, snapshotYaz,
+  arsivOku, arsivYaz
 } from "./veri";
 
 
@@ -130,6 +131,7 @@ function Navbar({ aktif, setAktif, onIndir, onYukle, sonGuncelleme }) {
     { id: "halkaarzi", label: "🏦 Halka Arz"       },
     { id: "takvim",    label: "📅 Takvim"          },
     { id: "nakit",     label: "💰 Nakit"           },
+    { id: "arsiv", label: "🗄 Arşiv" },
   ];
 
   return (
@@ -856,11 +858,6 @@ function HisseEkle({ onEkle, onIptal }) {
     setForm(prev => ({ ...prev, [key]: val }));
   }
 
-function hisseSil(id) {
-    if (!window.confirm(`${id} hissesini silmek istediğine emin misin?`)) return;
-    setHisseler(prev => prev.filter(h => h.id !== id));
-  }
-
   function ekle() {
     if (!form.id.trim() || !form.ad.trim() || !form.adet || !form.alis || !form.guncel) {
       alert("Sembol, Şirket Adı, Adet, Alış ve Güncel fiyat zorunlu.");
@@ -1178,6 +1175,11 @@ export default function App() {
   useEffect(() => {
     snapshotOku().then(setSnapshots);
   }, []);
+  const [arsiv, setArsiv] = useState([]);
+
+  useEffect(() => {
+    arsivOku().then(setArsiv);
+  }, []);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [takipListe, setTakipListe] = useState([]);
   const [alarmGecmisi, setAlarmGecmisi] = useState([]);
@@ -1419,6 +1421,31 @@ export default function App() {
     });
   }
 
+  function hisseSil(id) {
+    if (!window.confirm(`${id} hissesini portföyden çıkarmak istediğine emin misin? Arşive taşınacak.`)) return;
+    const hisse = hisseler.find(h => h.id === id);
+    if (hisse) {
+      const { kz, kzYuzde } = karZararHesapla(hisse);
+      const arsivKaydi = {
+        ...hisse,
+        cikisTarihi: new Date().toISOString().split("T")[0],
+        cikisKZ: parseFloat(kz.toFixed(0)),
+        cikisKZYuzde: kzYuzde,
+        cikisFiyati: hisse.guncel,
+      };
+      setArsiv(prev => {
+        const yeniArsiv = [arsivKaydi, ...prev];
+        arsivYaz(yeniArsiv);
+        return yeniArsiv;
+      });
+    }
+    setHisseler(prev => {
+      const yeni = prev.filter(h => h.id !== id);
+      portfoyYaz(yeni);
+      return yeni;
+    });
+  }
+
   function veriIndir() {
     const veri = { hisseler, nakit, tarih: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(veri, null, 2)], { type: "application/json" });
@@ -1546,6 +1573,17 @@ export default function App() {
 
         {aktifSayfa === "takvim" && (
           <BilancTakvim hisseler={hisseler} onGuncelle={hisseGuncelle} />
+        )}
+
+        {aktifSayfa === "arsiv" && (
+          <ArsivSayfasi
+            arsiv={arsiv}
+            onSil={(idx) => {
+              const yeni = arsiv.filter((_, j) => j !== idx);
+              setArsiv(yeni);
+              arsivYaz(yeni);
+            }}
+          />
         )}
 
         {aktifSayfa === "yeni" && (
@@ -3343,6 +3381,132 @@ function Rebalancing({ hisseler, nakit }) {
         <div className="panel" style={{ marginTop:"1rem", textAlign:"center", color:"#64748b", padding:"2rem" }}>
           Hiçbir hisseye hedef oran girilmemiş. Hisse detay sayfasından "Hedef Oran %" alanını doldur.
         </div>
+      )}
+    </div>
+  );
+}
+// ─── ARŞİV SAYFASI ───────────────────────────────────────────────────────
+function ArsivSayfasi({ arsiv, onSil }) {
+  const [filtre, setFiltre] = useState("TUMU");
+
+  const filtrelenmis = filtre === "TUMU" ? arsiv
+    : filtre === "KAR" ? arsiv.filter(h => parseFloat(h.cikisKZYuzde) >= 0)
+    : arsiv.filter(h => parseFloat(h.cikisKZYuzde) < 0);
+
+  const toplamKar   = arsiv.filter(h => h.cikisKZ >= 0).reduce((t, h) => t + h.cikisKZ, 0);
+  const toplamZarar = arsiv.filter(h => h.cikisKZ < 0).reduce((t, h) => t + h.cikisKZ, 0);
+  const netKZ = toplamKar + toplamZarar;
+
+  return (
+    <div>
+      <h2 className="sayfa-baslik">🗄 Arşiv — Portföyden Çıkan Hisseler</h2>
+
+      <div className="kart-grid" style={{ marginBottom:"1rem" }}>
+        <div className="kart">
+          <div className="kart-label">Toplam Çıkış</div>
+          <div className="kart-deger">{arsiv.length} hisse</div>
+        </div>
+        <div className="kart">
+          <div className="kart-label">Realize Kâr</div>
+          <div className="kart-deger yesil">
+            +{toplamKar.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL
+          </div>
+        </div>
+        <div className="kart">
+          <div className="kart-label">Realize Zarar</div>
+          <div className="kart-deger kirmizi">
+            {toplamZarar.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL
+          </div>
+        </div>
+        <div className="kart">
+          <div className="kart-label">Net Realizasyon</div>
+          <div className={`kart-deger ${netKZ >= 0 ? "yesil" : "kirmizi"}`}>
+            {netKZ >= 0 ? "+" : ""}
+            {netKZ.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL
+          </div>
+        </div>
+      </div>
+
+      {arsiv.length === 0 ? (
+        <div className="panel" style={{ textAlign:"center", color:"#64748b", padding:"2rem" }}>
+          Henüz arşivde hisse yok. Portföyden hisse silince buraya taşınır.
+        </div>
+      ) : (
+        <>
+          <div className="filtre-bar" style={{ marginBottom:"1rem" }}>
+            {[
+              { label:"Tümü",   val:"TUMU"  },
+              { label:"Kârlı",  val:"KAR"   },
+              { label:"Zararlı",val:"ZARAR" },
+            ].map(f => (
+              <button key={f.val}
+                className={`filtre-btn ${filtre === f.val ? "aktif" : ""}`}
+                onClick={() => setFiltre(f.val)}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="tablo-kap">
+            <table className="tablo">
+              <thead>
+                <tr>
+                  <th>Hisse</th>
+                  <th>Kat.</th>
+                  <th>Adet</th>
+                  <th>Alış</th>
+                  <th>Çıkış Fiyatı</th>
+                  <th>K/Z TL</th>
+                  <th>K/Z %</th>
+                  <th>Çıkış Tarihi</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtrelenmis.map((h, i) => {
+                  const kzPos = parseFloat(h.cikisKZYuzde) >= 0;
+                  return (
+                    <tr key={i}>
+                      <td>
+                        <b>{h.id}</b><br />
+                        <span className="kucuk">{h.ad}</span>
+                      </td>
+                      <td>
+                        <span className="kat-badge" style={{ background: kategoriRenk(h.kategori) }}>
+                          {h.kategori}
+                        </span>
+                      </td>
+                      <td>{h.adet?.toLocaleString("tr-TR")}</td>
+                      <td>{h.alis?.toFixed(2)}</td>
+                      <td>{h.cikisFiyati?.toFixed(2)}</td>
+                      <td className={kzPos ? "yesil" : "kirmizi"}>
+                        {kzPos ? "+" : ""}
+                        {h.cikisKZ?.toLocaleString("tr-TR", { maximumFractionDigits:0 })}
+                      </td>
+                      <td className={kzPos ? "yesil" : "kirmizi"}>
+                        {kzPos ? "+" : ""}{h.cikisKZYuzde}%
+                      </td>
+                      <td style={{ color:"#64748b" }}>
+                        {h.cikisTarihi ? new Date(h.cikisTarihi).toLocaleDateString("tr-TR") : "—"}
+                      </td>
+                      <td>
+                        <button
+                          onClick={() => {
+                            if (!window.confirm("Bu kaydı arşivden silmek istediğine emin misin?")) return;
+                            onSil(i);
+                          }}
+                          style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer" }}
+                        >
+                          🗑
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );
