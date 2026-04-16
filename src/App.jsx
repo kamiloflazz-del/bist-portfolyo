@@ -118,61 +118,122 @@ function aksiyonRenk(ak) {
 
 // ─── NAVBAR ──────────────────────────────────────────────────────────────
 function Navbar({ aktif, setAktif, onIndir, onYukle, sonGuncelleme }) {
-  const menuler = [
-    { id: "dashboard", label: "📊 Dashboard"     },
-    { id: "liste",     label: "📋 Hisseler"       },
-    { id: "takip",     label: "🔭 Takip"          },
-    { id: "guncelle",  label: "💱 Fiyat Güncelle" },
-    { id: "gunce",     label: "📝 Günce"           },
-    { id: "yeni",      label: "+ Hisse Ekle"       },
-    { id: "performans", label: "📊 Performans"     },
-    { id: "grafikler", label: "📈 Grafikler"       },
-    { id: "rebalance", label: "⚖️ Rebalance"       },
-    { id: "halkaarzi", label: "🏦 Halka Arz"       },
-    { id: "takvim",    label: "📅 Takvim"          },
-    { id: "nakit",     label: "💰 Nakit"           },
-    { id: "arsiv", label: "🗄 Arşiv" },
+  const [menuAcik, setMenuAcik] = useState(false);
+  const [mobilAcik, setMobilAcik] = useState(false);
+
+  const anaMenuler = [
+    { id: "dashboard", label: "📊 Dashboard" },
+    { id: "liste",     label: "📋 Hisseler"  },
+    { id: "takip",     label: "🔭 Takip"     },
+    { id: "guncelle",  label: "💱 Fiyat Güncelle"  },
+    { id: "gunce",     label: "📝 Günce"     },
+    
   ];
+
+  const digerMenuler = [
+    { id: "grafikler", label: "📈 Grafikler"        },
+    { id: "performans",label: "📊 Performans"       },
+    { id: "rebalance", label: "⚖️ Rebalance"        },
+    { id: "nakit",     label: "💰 Nakit"            },
+    { id: "halkaarzi", label: "🏦 Halka Arz"        },
+    { id: "takvim",    label: "📅 Takvim"           },
+    { id: "arsiv",     label: "🗄 Arşiv"            },
+    { id: "yeni",      label: "+ Hisse Ekle"        },
+  ];
+
+  const tumMenuler = [...anaMenuler, ...digerMenuler];
 
   return (
     <nav className="navbar">
-      <span className="navbar-logo">📈 BIST Portföy</span>
-      {sonGuncelleme && (
-        <span style={{ fontSize:"0.72rem", color:"#64748b", marginLeft:"0.5rem" }}>
-          🕐 {sonGuncelleme}
-        </span>
-      )}
-      <div className="navbar-menu">
-        {menuler.map(m => (
-          <button
-            key={m.id}
+      <span className="navbar-logo">📈 BIST
+        {sonGuncelleme && (
+          <span style={{ fontSize:"0.65rem", color:"#64748b", marginLeft:"6px", fontWeight:400 }}>
+            🕐 {sonGuncelleme}
+          </span>
+        )}
+      </span>
+
+      {/* Desktop Menü */}
+      <div className="navbar-menu navbar-desktop">
+        {anaMenuler.map(m => (
+          <button key={m.id}
             className={`nav-btn ${aktif === m.id ? "aktif" : ""}`}
-            onClick={() => setAktif(m.id)}
-          >
+            onClick={() => setAktif(m.id)}>
             {m.label}
           </button>
         ))}
-        <button className="nav-btn" onClick={onIndir}>⬇ Yedek</button>
-        <button
-          className="nav-btn"
-          onClick={() => document.getElementById("dosyaInput").click()}
-        >
-          ⬆ Yükle
-        </button>
-        <input
-          id="dosyaInput"
-          type="file"
-          accept=".json"
-          style={{ display: "none" }}
-          onChange={onYukle}
-        />
+
+        {/* Daha Fazla dropdown */}
+        <div style={{ position:"relative" }}>
+          <button
+            className={`nav-btn ${digerMenuler.some(m => m.id === aktif) ? "aktif" : ""}`}
+            onClick={() => setMenuAcik(!menuAcik)}>
+            ☰ Daha Fazla {menuAcik ? "▲" : "▼"}
+          </button>
+          {menuAcik && (
+            <div style={{
+              position:"absolute", top:"100%", right:0, zIndex:200,
+              background:"#1e2330", border:"1px solid #2d3748", borderRadius:"8px",
+              padding:"6px", minWidth:"180px", boxShadow:"0 8px 24px rgba(0,0,0,0.4)"
+            }}>
+              {digerMenuler.map(m => (
+                <button key={m.id}
+                  className={`nav-btn ${aktif === m.id ? "aktif" : ""}`}
+                  style={{ display:"block", width:"100%", textAlign:"left", marginBottom:"2px" }}
+                  onClick={() => { setAktif(m.id); setMenuAcik(false); }}>
+                  {m.label}
+                </button>
+              ))}
+              <div style={{ borderTop:"1px solid #2d3748", marginTop:"6px", paddingTop:"6px" }}>
+                <button className="nav-btn" style={{ display:"block", width:"100%", textAlign:"left" }}
+                  onClick={() => { onIndir(); setMenuAcik(false); }}>
+                  ⬇ Yedek
+                </button>
+                <button className="nav-btn"
+                  style={{ display:"block", width:"100%", textAlign:"left", cursor:"pointer" }}
+                  onClick={() => document.getElementById("dosyaInput").click()}>
+                  ⬆ Yükle
+                </button>
+                <input id="dosyaInput" type="file" accept=".json"
+                  style={{ display:"none" }} onChange={onYukle} />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Mobil Hamburger */}
+      <button className="mobil-menu-btn" onClick={() => setMobilAcik(!mobilAcik)}>
+        {mobilAcik ? "✕" : "☰"}
+      </button>
+
+      {/* Mobil Açılır Menü */}
+      {mobilAcik && (
+        <div className="mobil-menu">
+          {tumMenuler.map(m => (
+            <button key={m.id}
+              className={`mobil-menu-item ${aktif === m.id ? "aktif" : ""}`}
+              onClick={() => { setAktif(m.id); setMobilAcik(false); }}>
+              {m.label}
+            </button>
+          ))}
+          <div style={{ borderTop:"1px solid #2d3748", padding:"8px 0" }}>
+            <button className="mobil-menu-item" onClick={() => { onIndir(); setMobilAcik(false); }}>
+              ⬇ Yedek İndir
+            </button>
+            <label className="mobil-menu-item" style={{ cursor:"pointer" }}>
+              ⬆ Yedek Yükle
+              <input type="file" accept=".json" style={{ display:"none" }} onChange={onYukle} />
+            </label>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }
 
 // ─── DASHBOARD ───────────────────────────────────────────────────────────
-function Dashboard({ hisseler, nakit, onHisseClick, sonGuncelleme, takipListe }) {
+function Dashboard({ hisseler, nakit, onHisseClick, sonGuncelleme, takipListe, kapaliUyarilar, onUyariKapat, onUyarilariSifirla }) {
   const toplamHisse   = hisseler.reduce((t, h) => t + h.guncel * h.adet, 0);
   const toplamMaliyet = hisseler.reduce((t, h) => t + h.alis * h.adet, 0);
   const toplamKZ      = toplamHisse - toplamMaliyet;
@@ -183,48 +244,88 @@ function Dashboard({ hisseler, nakit, onHisseClick, sonGuncelleme, takipListe })
   const coreDeger    = coreHisseler.reduce((t, h) => t + h.guncel * h.adet, 0);
   const coreYuzde    = ((coreDeger / toplamVarlik) * 100).toFixed(0);
 
-  const tumUyarilar = hisseler.flatMap(h => uyariKontrol(h, toplamVarlik));
+  const tumUyarilar  = hisseler.flatMap(h => uyariKontrol(h, toplamVarlik));
+
   const takipAlarmlari = (takipListe || []).flatMap(h => {
     const guncel = parseFloat(h.guncel);
     if (!guncel || !h.alarmlar) return [];
     const { direncAl, destekAl, destekSat, direncSat } = h.alarmlar;
     const alarml = [];
     if (direncAl?.aktif && direncAl?.fiyat && guncel >= parseFloat(direncAl.fiyat))
-      alarml.push({ ...h, alarmTip: "📈 Direnç AL", alarmFiyat: direncAl.fiyat, renk: "#22c55e" });
+      alarml.push({ ...h, alarmTip:"📈 Direnç AL", alarmFiyat:direncAl.fiyat, renk:"#22c55e" });
     if (destekAl?.aktif && destekAl?.fiyat && guncel <= parseFloat(destekAl.fiyat))
-      alarml.push({ ...h, alarmTip: "💙 Destek AL", alarmFiyat: destekAl.fiyat, renk: "#38bdf8" });
+      alarml.push({ ...h, alarmTip:"💙 Destek AL", alarmFiyat:destekAl.fiyat, renk:"#38bdf8" });
     if (destekSat?.aktif && destekSat?.fiyat && guncel <= parseFloat(destekSat.fiyat))
-      alarml.push({ ...h, alarmTip: "📉 Destek SAT", alarmFiyat: destekSat.fiyat, renk: "#ef4444" });
+      alarml.push({ ...h, alarmTip:"📉 Destek SAT", alarmFiyat:destekSat.fiyat, renk:"#ef4444" });
     if (direncSat?.aktif && direncSat?.fiyat && guncel >= parseFloat(direncSat.fiyat))
-      alarml.push({ ...h, alarmTip: "⚠️ Direnç SAT", alarmFiyat: direncSat.fiyat, renk: "#f59e0b" });
+      alarml.push({ ...h, alarmTip:"⚠️ Direnç SAT", alarmFiyat:direncSat.fiyat, renk:"#f59e0b" });
     return alarml;
   });
 
-  const acilSatlar   = hisseler.filter(h => h.aksiyon === "SAT");
+  const acilSatlar = hisseler.filter(h => h.aksiyon === "SAT");
+
+  // En iyi ve en kötü 3 hisse
+  const siralanmis = [...hisseler].sort((a, b) => {
+    const { kzYuzde: ay } = karZararHesapla(a);
+    const { kzYuzde: by } = karZararHesapla(b);
+    return parseFloat(by) - parseFloat(ay);
+  });
+  const enIyi   = siralanmis.slice(0, 3);
+  const enKotu  = siralanmis.slice(-3).reverse();
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
-        <h2 style={{ fontSize: "1.4rem", fontWeight: 700, color: "#f1f5f9" }}>Dashboard</h2>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"1.25rem", flexWrap:"wrap", gap:"0.5rem" }}>
+        <h2 style={{ fontSize:"1.4rem", fontWeight:700, color:"#f1f5f9" }}>Dashboard</h2>
         {sonGuncelleme && (
-          <span style={{ fontSize: "0.75rem", color: "#64748b" }}>
-            🕐 Son güncelleme: {sonGuncelleme}
-          </span>
+          <span style={{ fontSize:"0.75rem", color:"#64748b" }}>🕐 Son güncelleme: {sonGuncelleme}</span>
         )}
       </div>
 
-      <div className="kart-grid">
+      {/* ── 1. Kritik Uyarılar — EN ÜSTTE ── */}
+      {takipAlarmlari.length > 0 && (
+        <div className="panel" style={{ marginBottom:"1rem", borderColor:"#f59e0b", borderWidth:"2px" }}>
+          <h3 className="panel-baslik" style={{ color:"#f59e0b" }}>
+            🔔 TAKİP ALARMLARI ({takipAlarmlari.length})
+          </h3>
+          {takipAlarmlari.map((h, i) => (
+            <div key={i} className="acil-satir">
+              <div>
+                <b style={{ color:"#f1f5f9" }}>{h.id}</b>
+                <span style={{ color:"#94a3b8", marginLeft:"8px", fontSize:"0.82rem" }}>{h.ad}</span>
+                <span style={{ marginLeft:"8px", fontWeight:600, color:h.renk }}>{h.alarmTip}</span>
+              </div>
+              <div style={{ display:"flex", gap:"12px", fontSize:"0.82rem" }}>
+                <span>Güncel: <b style={{ color:"#f1f5f9" }}>{h.guncel} TL</b></span>
+                <span>Alarm: <b style={{ color:h.renk }}>{h.alarmFiyat} TL</b></span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tumUyarilar.length > 0 && (
+        <div className="panel" style={{ marginBottom:"1rem" }}>
+          <h3 className="panel-baslik">⚠️ Portföy Uyarıları ({tumUyarilar.length})</h3>
+          {tumUyarilar.map((u, i) => (
+            <div key={i} className={`uyari uyari-${u.tip}`}>{u.mesaj}</div>
+          ))}
+        </div>
+      )}
+
+      {/* ── 2. Ana Özet Kartlar ── */}
+      <div className="kart-grid" style={{ marginBottom:"1rem" }}>
         <div className="kart">
           <div className="kart-label">Toplam Varlık</div>
           <div className="kart-deger">
-            {toplamVarlik.toLocaleString("tr-TR", { maximumFractionDigits: 0 })} TL
+            {toplamVarlik.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL
           </div>
         </div>
         <div className="kart">
           <div className="kart-label">Hisse K/Z</div>
           <div className={`kart-deger ${toplamKZ >= 0 ? "yesil" : "kirmizi"}`}>
             {toplamKZ >= 0 ? "+" : ""}
-            {toplamKZ.toLocaleString("tr-TR", { maximumFractionDigits: 0 })} TL
+            {toplamKZ.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL
             <span className="kart-alt"> ({toplamKZYuzde}%)</span>
           </div>
         </div>
@@ -236,60 +337,59 @@ function Dashboard({ hisseler, nakit, onHisseClick, sonGuncelleme, takipListe })
         </div>
         <div className="kart">
           <div className="kart-label">USD Fon</div>
-          <div className="kart-deger">
+          <div className="kart-deger" style={{ color:"#38bdf8" }}>
             {nakit.usdFon.toLocaleString("tr-TR")} TL
           </div>
         </div>
       </div>
 
-      <div className="panel" style={{ marginBottom: "1rem" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-          <span>CORE Ağırlığı</span>
-          <span><b>{coreYuzde}%</b> / Hedef: 52%</span>
+      {/* ── 3. CORE Progress ── */}
+      <div className="panel" style={{ marginBottom:"1rem" }}>
+        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"6px" }}>
+          <span style={{ fontSize:"0.85rem" }}>CORE Ağırlığı</span>
+          <span style={{ fontSize:"0.85rem" }}><b>{coreYuzde}%</b> / Hedef: 52%</span>
         </div>
         <div className="progress-track">
-          <div className="progress-bar" style={{ width: `${Math.min(coreYuzde, 100)}%` }} />
+          <div className="progress-bar" style={{ width:`${Math.min(coreYuzde, 100)}%` }} />
         </div>
       </div>
 
-      {/* Takip Alarmları */}
-      {takipAlarmlari.length > 0 && (
-        <div className="panel" style={{ marginBottom:"1rem", borderColor:"#f59e0b", borderWidth:"2px" }}>
-          <h3 className="panel-baslik" style={{ color:"#f59e0b" }}>
-            🔔 TAKİP ALARMLARI ({takipAlarmlari.length})
-          </h3>
-          {takipAlarmlari.map((h, i) => (
-            <div key={i} className="acil-satir">
-              <div>
-                <b style={{ color:"#f1f5f9" }}>{h.id}</b>
-                <span style={{ color:"#94a3b8", marginLeft:"8px", fontSize:"0.82rem" }}>{h.ad}</span>
-                <span style={{ marginLeft:"8px", fontWeight:600, color: h.renk }}>{h.alarmTip}</span>
-              </div>
-              <div style={{ display:"flex", gap:"12px", fontSize:"0.82rem" }}>
-                <span>Güncel: <b style={{ color:"#f1f5f9" }}>{h.guncel} TL</b></span>
-                <span>Alarm: <b style={{ color: h.renk }}>{h.alarmFiyat} TL</b></span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      
-      {tumUyarilar.length > 0 && (
-        <div className="panel" style={{ marginBottom: "1rem" }}>
-          <h3 className="panel-baslik">⚠️ Aktif Uyarılar ({tumUyarilar.length})</h3>
-          {tumUyarilar.map((u, i) => (
-            <div key={i} className={`uyari uyari-${u.tip}`}>{u.mesaj}</div>
-          ))}
-        </div>
-      )}
-
-      {acilSatlar.length > 0 && (
+      {/* ── 4. En İyi / En Kötü ── */}
+      <div className="g2" style={{ marginBottom:"1rem" }}>
         <div className="panel">
+          <h3 className="panel-baslik" style={{ color:"#22c55e" }}>🏆 En İyi 3</h3>
+          {enIyi.map(h => {
+            const { kzYuzde } = karZararHesapla(h);
+            return (
+              <div key={h.id} className="acil-satir" onClick={() => onHisseClick(h)} style={{ cursor:"pointer" }}>
+                <span><b>{h.id}</b> <span style={{ color:"#64748b", fontSize:"0.8rem" }}>{h.ad}</span></span>
+                <span className="yesil" style={{ fontWeight:700 }}>+{kzYuzde}%</span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="panel">
+          <h3 className="panel-baslik" style={{ color:"#ef4444" }}>📉 En Kötü 3</h3>
+          {enKotu.map(h => {
+            const { kzYuzde } = karZararHesapla(h);
+            return (
+              <div key={h.id} className="acil-satir" onClick={() => onHisseClick(h)} style={{ cursor:"pointer" }}>
+                <span><b>{h.id}</b> <span style={{ color:"#64748b", fontSize:"0.8rem" }}>{h.ad}</span></span>
+                <span className="kirmizi" style={{ fontWeight:700 }}>{kzYuzde}%</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── 5. Çıkış Beklenenler ── */}
+      {acilSatlar.length > 0 && (
+        <div className="panel" style={{ marginBottom:"1rem" }}>
           <h3 className="panel-baslik">🔴 Çıkış Bekleniyor ({acilSatlar.length})</h3>
           {acilSatlar.map(h => {
             const { kzYuzde } = karZararHesapla(h);
             return (
-              <div key={h.id} className="acil-satir" onClick={() => onHisseClick(h)}>
+              <div key={h.id} className="acil-satir" onClick={() => onHisseClick(h)} style={{ cursor:"pointer" }}>
                 <b>{h.id}</b> — {h.ad}
                 <span className="kz-badge kirmizi">{kzYuzde}%</span>
               </div>
@@ -297,76 +397,73 @@ function Dashboard({ hisseler, nakit, onHisseClick, sonGuncelleme, takipListe })
           })}
         </div>
       )}
-      {/* Kategori Dağılımı */}
-      <div className="panel" style={{ marginTop: "1rem" }}>
+
+      {/* ── 6. Kategori Dağılımı ── */}
+      <div className="panel" style={{ marginBottom:"1rem" }}>
         <h3 className="panel-baslik">📊 Kategori Dağılımı</h3>
         <div className="dagilim-grid">
-          {["CORE", "SAT", "TRADE"].map(kat => {
-            const katHisseler = hisseler.filter(h => h.kategori === kat);
-            const katDeger = katHisseler.reduce((t, h) => t + h.guncel * h.adet, 0);
-            const katYuzde = toplamVarlik > 0
-              ? ((katDeger / toplamVarlik) * 100).toFixed(1)
-              : 0;
+          {["CORE","SATELLITE","SAT","TRADE","PATATES","KUMBARA"].map(kat => {
+            const katH = hisseler.filter(h => h.kategori === kat);
+            const katD = katH.reduce((t, h) => t + h.guncel * h.adet, 0);
+            const katY = toplamVarlik > 0 ? ((katD / toplamVarlik) * 100).toFixed(1) : 0;
+            if (katD === 0) return null;
             return (
               <div key={kat} className="dagilim-kart">
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"6px" }}>
                   <span className="kat-badge" style={{ background: kategoriRenk(kat) }}>{kat}</span>
-                  <span style={{ fontWeight: 700, color: "#f1f5f9" }}>%{katYuzde}</span>
+                  <span style={{ fontWeight:700, color:"#f1f5f9" }}>%{katY}</span>
                 </div>
                 <div className="progress-track">
-                  <div className="progress-bar"
-                    style={{ width: `${katYuzde}%`, background: kategoriRenk(kat) }} />
+                  <div className="progress-bar" style={{ width:`${katY}%`, background: kategoriRenk(kat) }} />
                 </div>
-                <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "4px" }}>
-                  {katHisseler.length} hisse · {katDeger.toLocaleString("tr-TR", { maximumFractionDigits: 0 })} TL
+                <div style={{ fontSize:"0.75rem", color:"#64748b", marginTop:"4px" }}>
+                  {katH.length} hisse · {katD.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL
                 </div>
               </div>
             );
           })}
-          {/* Nakit */}
           <div className="dagilim-kart">
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-              <span className="kat-badge" style={{ background: "#0ea5e9" }}>NAKİT</span>
-              <span style={{ fontWeight: 700, color: "#f1f5f9" }}>
-                %{((( nakit.tlNakit + nakit.usdFon) / toplamVarlik) * 100).toFixed(1)}
+            <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"6px" }}>
+              <span className="kat-badge" style={{ background:"#0ea5e9" }}>NAKİT</span>
+              <span style={{ fontWeight:700, color:"#f1f5f9" }}>
+                %{(((nakit.tlNakit + nakit.usdFon) / toplamVarlik) * 100).toFixed(1)}
               </span>
             </div>
             <div className="progress-track">
               <div className="progress-bar"
-                style={{ width: `${((nakit.tlNakit + nakit.usdFon) / toplamVarlik) * 100}%`, background: "#0ea5e9" }} />
+                style={{ width:`${((nakit.tlNakit + nakit.usdFon) / toplamVarlik) * 100}%`, background:"#0ea5e9" }} />
             </div>
-            <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "4px" }}>
-              TL + USD Fon
-            </div>
+            <div style={{ fontSize:"0.75rem", color:"#64748b", marginTop:"4px" }}>TL + USD Fon</div>
           </div>
         </div>
       </div>
-      {/* Nakit Özeti */}
-      <div className="panel" style={{ marginTop: "1rem" }}>
+
+      {/* ── 7. Nakit Özeti ── */}
+      <div className="panel">
         <h3 className="panel-baslik">💰 Nakit Durumu</h3>
         <div className="kart-grid">
           <div className="kart">
             <div className="kart-label">TL Nakit</div>
             <div className="kart-deger yesil">
-              {nakit.tlNakit.toLocaleString("tr-TR", { maximumFractionDigits: 0 })} TL
+              {nakit.tlNakit.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL
             </div>
           </div>
           <div className="kart">
             <div className="kart-label">USD Fon</div>
-            <div className="kart-deger" style={{ color: "#38bdf8" }}>
-              {nakit.usdFon.toLocaleString("tr-TR", { maximumFractionDigits: 0 })} TL
+            <div className="kart-deger" style={{ color:"#38bdf8" }}>
+              {nakit.usdFon.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL
             </div>
           </div>
           <div className="kart">
             <div className="kart-label">Aylık Hedef</div>
             <div className="kart-deger">
-              {nakit.aylikEkleme.toLocaleString("tr-TR", { maximumFractionDigits: 0 })} TL
+              {nakit.aylikEkleme.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL
             </div>
           </div>
           <div className="kart">
             <div className="kart-label">Toplam Nakit</div>
             <div className="kart-deger">
-              {(nakit.tlNakit + nakit.usdFon).toLocaleString("tr-TR", { maximumFractionDigits: 0 })} TL
+              {(nakit.tlNakit + nakit.usdFon).toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL
             </div>
           </div>
         </div>
@@ -979,94 +1076,153 @@ function HisseEkle({ onEkle, onIptal }) {
 
 // ─── GÜNCE ───────────────────────────────────────────────────────────────
 function Gunce({ hisseler }) {
-  const [notlar, setNotlar] = useState([]);
+  const [notlar, setNotlar]     = useState([]);
   const [yuklendi, setYuklendi] = useState(false);
+  const [yeniNot, setYeniNot]   = useState("");
+  const [yeniTip, setYeniTip]   = useState("GENEL");
+  const [arama, setArama]       = useState("");
+  const [tipFiltre, setTipFiltre] = useState("TUMU");
+  const [hisseFiltre, setHisseFiltre] = useState("TUMU");
 
   useEffect(() => {
-    notlarOku().then(liste => {
-      setNotlar(liste);
-      setYuklendi(true);
-    });
+    notlarOku().then(liste => { setNotlar(liste); setYuklendi(true); });
   }, []);
 
   useEffect(() => {
     if (yuklendi) notlarYaz(notlar);
   }, [notlar, yuklendi]);
-  const [yeniNot, setYeniNot] = useState("");
-  const [arama, setArama]     = useState("");
+
+  const TIPLER = [
+    { val:"GENEL",   label:"📝 Genel",    renk:"#64748b" },
+    { val:"ANALIZ",  label:"🔍 Analiz",   renk:"#3b82f6" },
+    { val:"KARAR",   label:"✅ Karar",    renk:"#22c55e" },
+    { val:"HABER",   label:"📰 Haber",    renk:"#f59e0b" },
+    { val:"STRATEJI",label:"🎯 Strateji", renk:"#a855f7" },
+    { val:"RISK",    label:"⚠️ Risk",     renk:"#ef4444" },
+  ];
+
+  function tipRenk(tip) {
+    return TIPLER.find(t => t.val === tip)?.renk || "#64748b";
+  }
+  function tipLabel(tip) {
+    return TIPLER.find(t => t.val === tip)?.label || tip;
+  }
 
   function notEkle() {
     if (!yeniNot.trim()) return;
     const not = {
-      id:       Date.now(),
-      tarih:    new Date().toLocaleDateString("tr-TR"),
-      icerik:   yeniNot,
+      id:        Date.now(),
+      tarih:     new Date().toLocaleDateString("tr-TR"),
+      tarihISO:  new Date().toISOString(),
+      icerik:    yeniNot,
+      tip:       yeniTip,
       etiketler: (yeniNot.match(/#\w+/g) || []),
     };
-    const guncellenmis = [not, ...notlar];
-    setNotlar(guncellenmis);
-    
+    setNotlar(prev => [not, ...prev]);
     setYeniNot("");
   }
 
-  const filtrelenmis = notlar.filter(n =>
-    n.icerik.toLowerCase().includes(arama.toLowerCase())
-  );
+  // Hisse etiketlerini çıkar
+  const hisseIds = [...new Set(
+    notlar.flatMap(n => n.etiketler?.filter(e => e.startsWith("#")) || [])
+  )];
+
+  const filtrelenmis = notlar.filter(n => {
+    const aramaUygun = n.icerik.toLowerCase().includes(arama.toLowerCase());
+    const tipUygun = tipFiltre === "TUMU" || n.tip === tipFiltre;
+    const hisseUygun = hisseFiltre === "TUMU" ||
+      (n.etiketler || []).includes(hisseFiltre);
+    return aramaUygun && tipUygun && hisseUygun;
+  });
 
   return (
     <div>
       <h2 className="sayfa-baslik">📝 Günce</h2>
-      <div className="panel" style={{ marginBottom: "1rem" }}>
+
+      {/* Not Ekleme */}
+      <div className="panel" style={{ marginBottom:"1rem" }}>
+        <div style={{ display:"flex", gap:"8px", marginBottom:"0.5rem", flexWrap:"wrap" }}>
+          {TIPLER.map(t => (
+            <button key={t.val}
+              onClick={() => setYeniTip(t.val)}
+              style={{
+                padding:"3px 10px", borderRadius:"4px", border:"none", cursor:"pointer",
+                fontSize:"0.78rem", fontWeight:600,
+                background: yeniTip === t.val ? t.renk : "#2d3748",
+                color: yeniTip === t.val ? "#fff" : "#94a3b8",
+              }}>
+              {t.label}
+            </button>
+          ))}
+        </div>
         <textarea className="input-alan" rows={4}
-          placeholder={"Bugünkü yorumun...\n#PETKM #KRİZ gibi etiket ekleyebilirsin"}
+          placeholder={`${tipLabel(yeniTip)} notu... #ASTOR #KRİZ gibi etiket ekleyebilirsin`}
           value={yeniNot}
           onChange={e => setYeniNot(e.target.value)} />
-        <button className="btn btn-mavi" style={{ marginTop: "0.5rem" }} onClick={notEkle}>
+        <button className="btn btn-mavi" style={{ marginTop:"0.5rem" }} onClick={notEkle}>
           + Not Ekle
         </button>
       </div>
 
-      <input className="input" placeholder="🔍 Ara..."
-        value={arama} onChange={e => setArama(e.target.value)}
-        style={{ marginBottom: "1rem", width: "100%" }} />
+      {/* Filtreler */}
+      <div style={{ display:"flex", gap:"8px", marginBottom:"1rem", flexWrap:"wrap" }}>
+        <input className="input" placeholder="🔍 Ara..."
+          value={arama} onChange={e => setArama(e.target.value)}
+          style={{ flex:1, minWidth:"150px" }} />
+        <select className="input" style={{ width:"140px" }}
+          value={tipFiltre} onChange={e => setTipFiltre(e.target.value)}>
+          <option value="TUMU">Tüm Tipler</option>
+          {TIPLER.map(t => <option key={t.val} value={t.val}>{t.label}</option>)}
+        </select>
+        <select className="input" style={{ width:"140px" }}
+          value={hisseFiltre} onChange={e => setHisseFiltre(e.target.value)}>
+          <option value="TUMU">Tüm Hisseler</option>
+          {hisseIds.map(e => <option key={e} value={e}>{e}</option>)}
+        </select>
+      </div>
 
+      {/* Not Listesi */}
+      {filtrelenmis.length === 0 && (
+        <p style={{ color:"#64748b" }}>Not bulunamadı.</p>
+      )}
       {filtrelenmis.map(n => (
-        <div key={n.id} className="panel" style={{ marginBottom: "0.75rem" }}>
-          <div style={{ fontSize: "0.75rem", color: "#64748b", marginBottom: "4px" }}>
-            {n.tarih}
+        <div key={n.id} className="panel" style={{ marginBottom:"0.75rem",
+          borderLeft:`3px solid ${tipRenk(n.tip || "GENEL")}` }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"6px" }}>
+            <div style={{ display:"flex", gap:"8px", alignItems:"center", flexWrap:"wrap" }}>
+              <span style={{ fontSize:"0.72rem", color:"#64748b" }}>{n.tarih}</span>
+              <span style={{
+                fontSize:"0.72rem", fontWeight:600, padding:"1px 7px",
+                borderRadius:"3px", background: tipRenk(n.tip || "GENEL") + "33",
+                color: tipRenk(n.tip || "GENEL")
+              }}>
+                {tipLabel(n.tip || "GENEL")}
+              </span>
+            </div>
+            <button onClick={() => {
+              if (!window.confirm("Bu notu silmek istediğine emin misin?")) return;
+              setNotlar(prev => prev.filter(x => x.id !== n.id));
+            }} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", fontSize:"0.8rem" }}>
+              🗑
+            </button>
           </div>
-          <p style={{ lineHeight: "1.6", color: "#cbd5e1", whiteSpace: "pre-wrap" }}>
-            {n.icerik}
-          </p>
-          {n.etiketler.length > 0 && (
-            <div style={{ marginTop: "6px" }}>
+          <p style={{ lineHeight:"1.6", color:"#cbd5e1", whiteSpace:"pre-wrap" }}>{n.icerik}</p>
+          {(n.etiketler || []).length > 0 && (
+            <div style={{ marginTop:"6px" }}>
               {n.etiketler.map(e => (
-                <span key={e} className="etiket">{e}</span>
+                <span key={e} className="etiket"
+                  style={{ cursor:"pointer" }}
+                  onClick={() => setHisseFiltre(e)}>
+                  {e}
+                </span>
               ))}
             </div>
           )}
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "6px" }}>
-            <button
-              onClick={() => {
-                if (!window.confirm("Bu notu silmek istediğine emin misin?")) return;
-                const yeni = notlar.filter(x => x.id !== n.id);
-                setNotlar(yeni);
-              }}
-              style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: "0.8rem" }}
-            >
-              🗑 Sil
-            </button>
-          </div>
         </div>
       ))}
-
-      {filtrelenmis.length === 0 && (
-        <p style={{ color: "#64748b" }}>Henüz not yok.</p>
-      )}
     </div>
   );
 }
-
 // ─── FİYAT GÜNCELLE ──────────────────────────────────────────────────────
 function FiyatGuncelle({ hisseler, onKaydet, onIptal, onFiyatCek, fiyatYukleniyor }) {
   const [fiyatlar, setFiyatlar] = useState(

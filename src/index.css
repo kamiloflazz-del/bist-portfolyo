@@ -150,3 +150,44 @@ body {
 }
 
 .uyari-oran { background: #4c1d9533; border-left: 3px solid #a855f7; color: #d8b4fe; }
+
+/* Navbar Desktop/Mobil */
+.navbar-desktop { display: flex; }
+.mobil-menu-btn {
+  display: none;
+  background: none; border: none;
+  color: #94a3b8; font-size: 1.3rem;
+  cursor: pointer; padding: 4px 8px;
+}
+.mobil-menu {
+  display: none;
+  position: absolute; top: 100%; left: 0; right: 0; z-index: 200;
+  background: #1e2330; border-bottom: 1px solid #2d3748;
+  padding: 8px;
+}
+.mobil-menu-item {
+  display: block; width: 100%;
+  padding: 10px 12px; margin-bottom: 2px;
+  background: none; border: none; border-radius: 6px;
+  color: #94a3b8; cursor: pointer; font-size: 0.9rem;
+  text-align: left;
+}
+.mobil-menu-item:hover, .mobil-menu-item.aktif {
+  background: #2d3748; color: #f1f5f9;
+}
+.mobil-menu-item.aktif { background: #1d4ed8; color: #fff; }
+
+@media (max-width: 768px) {
+  .navbar-desktop { display: none !important; }
+  .mobil-menu-btn { display: block; }
+  .mobil-menu { display: block; }
+  .navbar { position: relative; flex-wrap: wrap; }
+  .main { padding: 1rem 0.75rem; }
+  .kart-grid { grid-template-columns: 1fr 1fr; }
+  .tablo th, .tablo td { padding: 0.5rem 0.4rem; font-size: 0.75rem; }
+  .form-grid { grid-template-columns: 1fr; }
+  .g2 { grid-template-columns: 1fr; }
+  .dagilim-grid { grid-template-columns: 1fr 1fr; }
+  .filtre-bar { gap: 0.3rem; }
+  .filtre-btn { font-size: 0.72rem; padding: 0.25rem 0.6rem; }
+}
