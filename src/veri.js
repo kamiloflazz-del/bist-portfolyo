@@ -115,3 +115,14 @@ export async function alarmGecmisiYaz(liste) {
   const ref = doc(db, "alarmGecmisi", KULLANICI_ID);
   await setDoc(ref, { liste: temizle(liste) });
 }
+
+export async function snapshotOku() {
+  const ref = doc(db, "snapshot", KULLANICI_ID);
+  const snap = await getDoc(ref);
+  return snap.exists() ? snap.data().liste : [];
+}
+
+export async function snapshotYaz(liste) {
+  const ref = doc(db, "snapshot", KULLANICI_ID);
+  await setDoc(ref, { liste: temizle(liste) });
+}

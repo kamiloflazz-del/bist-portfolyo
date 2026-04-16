@@ -15,7 +15,8 @@ import {
   takipOku,   takipYaz,
   portfoyDinle, nakitDinle,
   bilancOku, bilancYaz,
-  alarmGecmisiOku, alarmGecmisiYaz
+  alarmGecmisiOku, alarmGecmisiYaz,
+  snapshotOku, snapshotYaz
 } from "./veri";
 
 
@@ -115,7 +116,7 @@ function aksiyonRenk(ak) {
 }
 
 // ─── NAVBAR ──────────────────────────────────────────────────────────────
-function Navbar({ aktif, setAktif, onIndir, onYukle }) {
+function Navbar({ aktif, setAktif, onIndir, onYukle, sonGuncelleme }) {
   const menuler = [
     { id: "dashboard", label: "📊 Dashboard"     },
     { id: "liste",     label: "📋 Hisseler"       },
@@ -123,7 +124,9 @@ function Navbar({ aktif, setAktif, onIndir, onYukle }) {
     { id: "guncelle",  label: "💱 Fiyat Güncelle" },
     { id: "gunce",     label: "📝 Günce"           },
     { id: "yeni",      label: "+ Hisse Ekle"       },
+    { id: "performans", label: "📊 Performans"     },
     { id: "grafikler", label: "📈 Grafikler"       },
+    { id: "rebalance", label: "⚖️ Rebalance"       },
     { id: "halkaarzi", label: "🏦 Halka Arz"       },
     { id: "takvim",    label: "📅 Takvim"          },
     { id: "nakit",     label: "💰 Nakit"           },
@@ -132,6 +135,11 @@ function Navbar({ aktif, setAktif, onIndir, onYukle }) {
   return (
     <nav className="navbar">
       <span className="navbar-logo">📈 BIST Portföy</span>
+      {sonGuncelleme && (
+        <span style={{ fontSize:"0.72rem", color:"#64748b", marginLeft:"0.5rem" }}>
+          🕐 {sonGuncelleme}
+        </span>
+      )}
       <div className="navbar-menu">
         {menuler.map(m => (
           <button
@@ -809,6 +817,9 @@ function HisseDetay({ hisse, onGuncelle, onGeri, onSil, toplamVarlik }) {
         </div>
       )}
 
+      {/* İşlem Geçmişi */}
+      <HisseIslemGecmisi hisseId={hisse.id} />
+      
       {/* Butonlar */}
       <div className="btn-grup">
         {duzenleme ? (
@@ -1159,20 +1170,79 @@ export default function App() {
   const [aktifSayfa,  setAktifSayfa]  = useState("dashboard");
   const [seciliHisse, setSeciliHisse] = useState(null);
   const [fiyatYukleniyor, setFiyatYukleniyor] = useState(false);
-  const [sonGuncelleme,   setSonGuncelleme]   = useState(null);
+  const [sonGuncelleme, setSonGuncelleme] = useState(
+    localStorage.getItem("son_guncelleme") || null
+  );
+  const [snapshots, setSnapshots] = useState([]);
+
+  useEffect(() => {
+    snapshotOku().then(setSnapshots);
+  }, []);
   const [yukleniyor, setYukleniyor] = useState(true);
   const [takipListe, setTakipListe] = useState([]);
+  const [alarmGecmisi, setAlarmGecmisi] = useState([]);
 
   useEffect(() => {
     takipOku().then(setTakipListe);
   }, []);
 
-  const [alarmGecmisi, setAlarmGecmisi] = useState([]);
-
   useEffect(() => {
     alarmGecmisiOku().then(setAlarmGecmisi);
   }, []);
 
+  useEffect(() => {
+    takipOku().then(setTakipListe);
+  }, []);
+
+  
+  // Otomatik fiyat güncelleme — borsa saatlerinde her 15 dakika
+  useEffect(() => {
+    function borsaAcikMi() {
+      const simdi = new Date();
+      const gun = simdi.getDay(); // 0=Pazar, 6=Cumartesi
+      const saat = simdi.getHours();
+      const dakika = simdi.getMinutes();
+      const toplamDakika = saat * 60 + dakika;
+      // Hafta içi, 10:00-18:00 arası
+      return gun >= 1 && gun <= 5 && toplamDakika >= 600 && toplamDakika <= 1080;
+    }
+
+    const interval = setInterval(() => {
+      if (borsaAcikMi()) {
+        console.log("Otomatik fiyat güncelleme...");
+        fiyatlariCek();
+      }
+    }, 15 * 60 * 1000); // 15 dakika
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Günlük snapshot — her gün bir kez portföy değerini kaydet
+  useEffect(() => {
+    if (yukleniyor || hisseler.length === 0) return;
+
+    const bugun = new Date().toISOString().split("T")[0];
+    const sonSnapshot = snapshots[0]?.tarih;
+
+    if (sonSnapshot === bugun) return; // Bugün zaten alındı
+
+    const toplamHisse = hisseler.reduce((t, h) => t + h.guncel * h.adet, 0);
+    const toplamVarlik = toplamHisse + nakit.tlNakit + nakit.usdFon;
+
+    const yeniSnapshot = {
+      tarih: bugun,
+      toplamVarlik: parseFloat(toplamVarlik.toFixed(0)),
+      toplamHisse: parseFloat(toplamHisse.toFixed(0)),
+      tlNakit: nakit.tlNakit,
+      usdFon: nakit.usdFon,
+    };
+
+    const yeniListe = [yeniSnapshot, ...snapshots].slice(0, 365); // Max 1 yıl
+    setSnapshots(yeniListe);
+    snapshotYaz(yeniListe);
+    console.log("Snapshot alındı:", bugun, toplamVarlik);
+  }, [yukleniyor, hisseler]);
+  
   // Firebase'den veri yükle
   useEffect(() => {
     let ilkYukleme = true;
@@ -1311,7 +1381,9 @@ export default function App() {
 
       setHisseler(yeniHisseler);
       localStorage.setItem("bist_portfoy", JSON.stringify(yeniHisseler));
-      setSonGuncelleme(new Date().toLocaleTimeString("tr-TR"));
+      const zaman = new Date().toLocaleString("tr-TR");
+      setSonGuncelleme(zaman);
+      localStorage.setItem("son_guncelleme", zaman);
       if (onBitti) onBitti(yeniFiyatlar);
       alert(`✅ ${guncellenenSayisi} hissenin fiyatı güncellendi!`);
 
@@ -1386,6 +1458,7 @@ export default function App() {
         setAktif={setAktifSayfa}
         onIndir={veriIndir}
         onYukle={veriYukleFile}
+        sonGuncelleme={sonGuncelleme}
       />
       <main className="main">
 
@@ -1449,6 +1522,14 @@ export default function App() {
             onFiyatCek={fiyatlariCek}
             fiyatYukleniyor={fiyatYukleniyor}
           />
+        )}
+
+        {aktifSayfa === "performans" && (
+          <PerformansTakibi snapshots={snapshots} />
+        )}
+
+        {aktifSayfa === "rebalance" && (
+          <Rebalancing hisseler={hisseler} nakit={nakit} />
         )}
 
         {aktifSayfa === "gunce" && (
@@ -2763,6 +2844,504 @@ function TakipListesi({ liste, setListe, alarmGecmisi = [], onAlarmSil, onTumAla
               </div>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── PERFORMANS TAKİBİ ────────────────────────────────────────────────────
+function PerformansTakibi({ snapshots }) {
+  const [filtre, setFiltre] = useState("30");
+
+  const gunSayisi = parseInt(filtre);
+  const filtrelenmis = [...snapshots]
+    .reverse()
+    .slice(-gunSayisi);
+
+  if (filtrelenmis.length === 0) {
+    return (
+      <div>
+        <h2 className="sayfa-baslik">📊 Performans Takibi</h2>
+        <div className="panel" style={{ textAlign:"center", color:"#64748b", padding:"2rem" }}>
+          Henüz snapshot yok. Yarın tekrar bak — her gün otomatik kayıt alınıyor.
+        </div>
+      </div>
+    );
+  }
+
+  const ilk = filtrelenmis[0]?.toplamVarlik || 0;
+  const son = filtrelenmis[filtrelenmis.length - 1]?.toplamVarlik || 0;
+  const degisim = son - ilk;
+  const degisimYuzde = ilk > 0 ? ((degisim / ilk) * 100).toFixed(2) : 0;
+  const maxDeger = Math.max(...filtrelenmis.map(s => s.toplamVarlik));
+  const minDeger = Math.min(...filtrelenmis.map(s => s.toplamVarlik));
+
+  return (
+    <div>
+      <h2 className="sayfa-baslik">📊 Performans Takibi</h2>
+
+      {/* Filtre */}
+      <div className="filtre-bar" style={{ marginBottom:"1rem" }}>
+        {[
+          { label:"7 Gün",  val:"7"   },
+          { label:"30 Gün", val:"30"  },
+          { label:"90 Gün", val:"90"  },
+          { label:"1 Yıl",  val:"365" },
+        ].map(f => (
+          <button key={f.val}
+            className={`filtre-btn ${filtre === f.val ? "aktif" : ""}`}
+            onClick={() => setFiltre(f.val)}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Özet Kartlar */}
+      <div className="kart-grid" style={{ marginBottom:"1rem" }}>
+        <div className="kart">
+          <div className="kart-label">Başlangıç Değeri</div>
+          <div className="kart-deger">
+            {ilk.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL
+          </div>
+        </div>
+        <div className="kart">
+          <div className="kart-label">Güncel Değer</div>
+          <div className="kart-deger">
+            {son.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL
+          </div>
+        </div>
+        <div className="kart">
+          <div className="kart-label">Değişim</div>
+          <div className={`kart-deger ${degisim >= 0 ? "yesil" : "kirmizi"}`}>
+            {degisim >= 0 ? "+" : ""}
+            {degisim.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL
+            <span className="kart-alt"> ({degisimYuzde}%)</span>
+          </div>
+        </div>
+        <div className="kart">
+          <div className="kart-label">Snapshot Sayısı</div>
+          <div className="kart-deger">{filtrelenmis.length} gün</div>
+        </div>
+      </div>
+
+      {/* Grafik */}
+      <div className="panel" style={{ marginBottom:"1rem" }}>
+        <h3 className="panel-baslik">Portföy Değeri Zaman Serisi</h3>
+        <div style={{ overflowX:"auto" }}>
+          <div style={{ minWidth:"600px", padding:"1rem 0" }}>
+            <svg viewBox={`0 0 ${Math.max(600, filtrelenmis.length * 20)} 200`}
+              style={{ width:"100%", height:"200px" }}>
+              {/* Grid çizgileri */}
+              {[0,25,50,75,100].map(y => (
+                <line key={y}
+                  x1="0" y1={y * 2}
+                  x2={Math.max(600, filtrelenmis.length * 20)} y2={y * 2}
+                  stroke="#2d3748" strokeWidth="0.5" />
+              ))}
+              {/* Alan */}
+              {filtrelenmis.length > 1 && (() => {
+                const w = Math.max(600, filtrelenmis.length * 20);
+                const aralik = maxDeger - minDeger || 1;
+                const noktalar = filtrelenmis.map((s, i) => {
+                  const x = (i / (filtrelenmis.length - 1)) * w;
+                  const y = 190 - ((s.toplamVarlik - minDeger) / aralik) * 170;
+                  return `${x},${y}`;
+                });
+                const alan = `M0,190 L${noktalar.join(" L")} L${w},190 Z`;
+                const cizgi = `M${noktalar.join(" L")}`;
+                return (
+                  <>
+                    <path d={alan} fill="#1d4ed833" />
+                    <path d={cizgi} fill="none" stroke="#3b82f6" strokeWidth="2" />
+                    {filtrelenmis.map((s, i) => {
+                      const x = (i / (filtrelenmis.length - 1)) * w;
+                      const y = 190 - ((s.toplamVarlik - minDeger) / aralik) * 170;
+                      return <circle key={i} cx={x} cy={y} r="3" fill="#3b82f6" />;
+                    })}
+                  </>
+                );
+              })()}
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      {/* Tablo */}
+      <div className="panel">
+        <h3 className="panel-baslik">Günlük Kayıtlar</h3>
+        <div className="tablo-kap">
+          <table className="tablo">
+            <thead>
+              <tr>
+                <th>Tarih</th>
+                <th>Toplam Varlık</th>
+                <th>Hisse Değeri</th>
+                <th>TL Nakit</th>
+                <th>Değişim</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...filtrelenmis].reverse().map((s, i, arr) => {
+                const onceki = arr[i + 1];
+                const fark = onceki ? s.toplamVarlik - onceki.toplamVarlik : 0;
+                return (
+                  <tr key={s.tarih}>
+                    <td>{new Date(s.tarih).toLocaleDateString("tr-TR")}</td>
+                    <td>{s.toplamVarlik.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL</td>
+                    <td>{s.toplamHisse.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL</td>
+                    <td>{s.tlNakit.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL</td>
+                    <td className={fark >= 0 ? "yesil" : "kirmizi"}>
+                      {fark !== 0 ? `${fark >= 0 ? "+" : ""}${fark.toLocaleString("tr-TR", { maximumFractionDigits:0 })}` : "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── HİSSE İŞLEM GEÇMİŞİ ─────────────────────────────────────────────────
+function HisseIslemGecmisi({ hisseId }) {
+  const [islemler, setIslemler] = useState([]);
+  const [formAcik, setFormAcik] = useState(false);
+  const [form, setForm] = useState({
+    tip: "ALIM", adet: "", fiyat: "", tarih: new Date().toISOString().split("T")[0], not: ""
+  });
+
+  useEffect(() => {
+    islemlerOku().then(tumIslemler => {
+      const hisseIslemleri = tumIslemler.filter(i => i.hisseId === hisseId);
+      setIslemler(hisseIslemleri);
+    });
+  }, [hisseId]);
+
+  function ekle() {
+    if (!form.adet || !form.fiyat) { alert("Adet ve fiyat zorunlu."); return; }
+    const yeniIslem = {
+      id: Date.now(),
+      hisseId,
+      tip: form.tip,
+      adet: parseInt(form.adet),
+      fiyat: parseFloat(form.fiyat),
+      tutar: parseInt(form.adet) * parseFloat(form.fiyat),
+      tarih: form.tarih,
+      not: form.not,
+    };
+    islemlerOku().then(tumIslemler => {
+      const yeni = [yeniIslem, ...tumIslemler];
+      islemlerYaz(yeni);
+      setIslemler(prev => [yeniIslem, ...prev]);
+    });
+    setForm({ tip:"ALIM", adet:"", fiyat:"", tarih: new Date().toISOString().split("T")[0], not:"" });
+    setFormAcik(false);
+  }
+
+  function sil(id) {
+    if (!window.confirm("Bu işlemi silmek istediğine emin misin?")) return;
+    islemlerOku().then(tumIslemler => {
+      const yeni = tumIslemler.filter(i => i.id !== id);
+      islemlerYaz(yeni);
+      setIslemler(prev => prev.filter(i => i.id !== id));
+    });
+  }
+
+  const toplamAlim  = islemler.filter(i => i.tip === "ALIM").reduce((t, i) => t + i.tutar, 0);
+  const toplamSatim = islemler.filter(i => i.tip === "SATIM").reduce((t, i) => t + i.tutar, 0);
+  const realizasyon = toplamSatim - toplamAlim;
+
+  return (
+    <div className="panel" style={{ marginBottom:"1rem" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"0.75rem" }}>
+        <h3 className="panel-baslik" style={{ margin:0 }}>📋 İşlem Geçmişi</h3>
+        <button className="btn btn-mavi" style={{ fontSize:"0.78rem", padding:"4px 10px" }}
+          onClick={() => setFormAcik(!formAcik)}>
+          {formAcik ? "İptal" : "+ İşlem Ekle"}
+        </button>
+      </div>
+
+      {/* Form */}
+      {formAcik && (
+        <div style={{ background:"#0f1117", borderRadius:"8px", padding:"12px", marginBottom:"0.75rem" }}>
+          <div className="form-grid" style={{ marginBottom:"0.75rem" }}>
+            <label className="form-label">
+              Tip
+              <select className="input" value={form.tip}
+                onChange={e => setForm({ ...form, tip: e.target.value })}>
+                <option value="ALIM">📈 Alım</option>
+                <option value="SATIM">📉 Satım</option>
+              </select>
+            </label>
+            <label className="form-label">
+              Adet
+              <input className="input" type="number"
+                value={form.adet} onChange={e => setForm({ ...form, adet: e.target.value })} />
+            </label>
+            <label className="form-label">
+              Fiyat (TL)
+              <input className="input" type="number" step="0.01"
+                value={form.fiyat} onChange={e => setForm({ ...form, fiyat: e.target.value })} />
+            </label>
+            <label className="form-label">
+              Tarih
+              <input className="input" type="date"
+                value={form.tarih} onChange={e => setForm({ ...form, tarih: e.target.value })} />
+            </label>
+          </div>
+          <label className="form-label" style={{ display:"block", marginBottom:"0.75rem" }}>
+            Not
+            <input className="input" type="text" placeholder="opsiyonel"
+              value={form.not} onChange={e => setForm({ ...form, not: e.target.value })} />
+          </label>
+          <div style={{ display:"flex", gap:"6px", alignItems:"center" }}>
+            <button className="btn btn-yesil" onClick={ekle}>✓ Ekle</button>
+            {form.adet && form.fiyat && (
+              <span style={{ fontSize:"0.8rem", color:"#94a3b8" }}>
+                Toplam: {(parseInt(form.adet||0) * parseFloat(form.fiyat||0)).toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Özet */}
+      {islemler.length > 0 && (
+        <div style={{ display:"flex", gap:"1rem", flexWrap:"wrap", marginBottom:"0.75rem", fontSize:"0.82rem" }}>
+          <span style={{ color:"#94a3b8" }}>
+            Toplam Alım: <b style={{ color:"#ef4444" }}>{toplamAlim.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL</b>
+          </span>
+          <span style={{ color:"#94a3b8" }}>
+            Toplam Satım: <b style={{ color:"#22c55e" }}>{toplamSatim.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL</b>
+          </span>
+          {toplamSatim > 0 && (
+            <span style={{ color:"#94a3b8" }}>
+              Realizasyon K/Z: <b className={realizasyon >= 0 ? "yesil" : "kirmizi"}>
+                {realizasyon >= 0 ? "+" : ""}{realizasyon.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL
+              </b>
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Liste */}
+      {islemler.length === 0 && !formAcik && (
+        <p style={{ color:"#64748b", fontSize:"0.82rem" }}>Henüz işlem kaydı yok.</p>
+      )}
+      {islemler.map(i => (
+        <div key={i.id} style={{
+          display:"flex", justifyContent:"space-between", alignItems:"center",
+          padding:"0.5rem 0", borderBottom:"1px solid #1a2035", fontSize:"0.82rem"
+        }}>
+          <div>
+            <span style={{ color: i.tip === "ALIM" ? "#ef4444" : "#22c55e", fontWeight:600, marginRight:"8px" }}>
+              {i.tip === "ALIM" ? "📈 ALIM" : "📉 SATIM"}
+            </span>
+            <span style={{ color:"#f1f5f9" }}>{i.adet} adet × {i.fiyat} TL</span>
+            <span style={{ color:"#64748b", marginLeft:"8px" }}>
+              = {i.tutar.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL
+            </span>
+            {i.not && <span style={{ color:"#64748b", marginLeft:"8px" }}>— {i.not}</span>}
+            <div style={{ color:"#475569", fontSize:"0.75rem" }}>
+              {new Date(i.tarih).toLocaleDateString("tr-TR")}
+            </div>
+          </div>
+          <button onClick={() => sil(i.id)}
+            style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer" }}>✕</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── REBALANCİNG ─────────────────────────────────────────────────────────
+function Rebalancing({ hisseler, nakit }) {
+  const toplamVarlik = hisseler.reduce((t, h) => t + h.guncel * h.adet, 0)
+    + nakit.tlNakit + nakit.usdFon;
+
+  // Kategori bazlı mevcut durum
+  const kategoriler = ["CORE", "SATELLITE", "SAT", "TRADE", "PATATES", "KUMBARA"];
+  const kategoriOzetleri = kategoriler.map(kat => {
+    const katHisseler = hisseler.filter(h => h.kategori === kat);
+    const deger = katHisseler.reduce((t, h) => t + h.guncel * h.adet, 0);
+    const oran = toplamVarlik > 0 ? (deger / toplamVarlik) * 100 : 0;
+    return { kat, deger, oran, hisseSayisi: katHisseler.length };
+  }).filter(k => k.deger > 0 || k.kat === "CORE");
+
+  // Hisse bazlı rebalancing
+  const hisseRebalance = hisseler.map(h => {
+    const mevcutDeger = h.guncel * h.adet;
+    const mevcutOran = toplamVarlik > 0 ? (mevcutDeger / toplamVarlik) * 100 : 0;
+    const hedefOran = h.hedefOran || 0;
+    const hedefDeger = (hedefOran / 100) * toplamVarlik;
+    const fark = hedefDeger - mevcutDeger;
+    const farkAdet = h.guncel > 0 ? Math.abs(fark / h.guncel) : 0;
+    return {
+      ...h, mevcutDeger, mevcutOran, hedefDeger, fark, farkAdet
+    };
+  }).filter(h => h.hedefOran > 0);
+
+  const toplamHedefOran = hisseRebalance.reduce((t, h) => t + (h.hedefOran || 0), 0);
+  const alimListesi = hisseRebalance.filter(h => h.fark > 1000).sort((a,b) => b.fark - a.fark);
+  const satimListesi = hisseRebalance.filter(h => h.fark < -1000).sort((a,b) => a.fark - b.fark);
+
+  return (
+    <div>
+      <h2 className="sayfa-baslik">⚖️ Rebalancing Hesaplayıcı</h2>
+      <p style={{ color:"#64748b", fontSize:"0.85rem", marginBottom:"1rem" }}>
+        Hedef oranlara göre portföyünü dengele. Hisse detay sayfasından her hissenin hedef oranını girebilirsin.
+      </p>
+
+      {/* Özet */}
+      <div className="kart-grid" style={{ marginBottom:"1rem" }}>
+        <div className="kart">
+          <div className="kart-label">Toplam Varlık</div>
+          <div className="kart-deger">
+            {toplamVarlik.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL
+          </div>
+        </div>
+        <div className="kart">
+          <div className="kart-label">Tanımlı Hedef Oran</div>
+          <div className={`kart-deger ${toplamHedefOran > 100 ? "kirmizi" : "yesil"}`}>
+            %{toplamHedefOran.toFixed(1)}
+            {toplamHedefOran > 100 && <span className="kart-alt"> ⚠️ %100 aşıyor</span>}
+          </div>
+        </div>
+        <div className="kart">
+          <div className="kart-label">Alım Gerekli</div>
+          <div className="kart-deger yesil">{alimListesi.length} hisse</div>
+        </div>
+        <div className="kart">
+          <div className="kart-label">Satım Gerekli</div>
+          <div className="kart-deger kirmizi">{satimListesi.length} hisse</div>
+        </div>
+      </div>
+
+      {/* Alım Listesi */}
+      {alimListesi.length > 0 && (
+        <div className="panel" style={{ marginBottom:"1rem" }}>
+          <h3 className="panel-baslik" style={{ color:"#22c55e" }}>
+            📈 Alım Gerekli ({alimListesi.length} hisse)
+          </h3>
+          <div className="tablo-kap">
+            <table className="tablo">
+              <thead>
+                <tr>
+                  <th>Hisse</th>
+                  <th>Mevcut TL</th>
+                  <th>Mevcut %</th>
+                  <th>Hedef %</th>
+                  <th>Hedef TL</th>
+                  <th>Alım TL</th>
+                  <th>Tahmini Adet</th>
+                </tr>
+              </thead>
+              <tbody>
+                {alimListesi.map(h => (
+                  <tr key={h.id}>
+                    <td>
+                      <b>{h.id}</b>
+                      <br />
+                      <span className="kucuk">{h.ad}</span>
+                    </td>
+                    <td>{h.mevcutDeger.toLocaleString("tr-TR", { maximumFractionDigits:0 })}</td>
+                    <td className={h.mevcutOran < h.hedefOran ? "kirmizi" : "yesil"}>
+                      %{h.mevcutOran.toFixed(1)}
+                    </td>
+                    <td>%{h.hedefOran}</td>
+                    <td>{h.hedefDeger.toLocaleString("tr-TR", { maximumFractionDigits:0 })}</td>
+                    <td className="yesil" style={{ fontWeight:700 }}>
+                      +{h.fark.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL
+                    </td>
+                    <td className="yesil">
+                      ~{Math.ceil(h.farkAdet).toLocaleString("tr-TR")} adet
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Satım Listesi */}
+      {satimListesi.length > 0 && (
+        <div className="panel" style={{ marginBottom:"1rem" }}>
+          <h3 className="panel-baslik" style={{ color:"#ef4444" }}>
+            📉 Satım Değerlendir ({satimListesi.length} hisse)
+          </h3>
+          <div className="tablo-kap">
+            <table className="tablo">
+              <thead>
+                <tr>
+                  <th>Hisse</th>
+                  <th>Mevcut TL</th>
+                  <th>Mevcut %</th>
+                  <th>Hedef %</th>
+                  <th>Hedef TL</th>
+                  <th>Azalt TL</th>
+                  <th>Tahmini Adet</th>
+                </tr>
+              </thead>
+              <tbody>
+                {satimListesi.map(h => (
+                  <tr key={h.id}>
+                    <td>
+                      <b>{h.id}</b>
+                      <br />
+                      <span className="kucuk">{h.ad}</span>
+                    </td>
+                    <td>{h.mevcutDeger.toLocaleString("tr-TR", { maximumFractionDigits:0 })}</td>
+                    <td className="kirmizi">%{h.mevcutOran.toFixed(1)}</td>
+                    <td>%{h.hedefOran}</td>
+                    <td>{h.hedefDeger.toLocaleString("tr-TR", { maximumFractionDigits:0 })}</td>
+                    <td className="kirmizi" style={{ fontWeight:700 }}>
+                      {h.fark.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL
+                    </td>
+                    <td className="kirmizi">
+                      ~{Math.ceil(h.farkAdet).toLocaleString("tr-TR")} adet
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Kategori Dağılımı */}
+      <div className="panel">
+        <h3 className="panel-baslik">📊 Kategori Dağılımı</h3>
+        <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
+          {kategoriOzetleri.map(k => (
+            <div key={k.kat} style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+              <span className="kat-badge" style={{ background: kategoriRenk(k.kat), width:"80px", textAlign:"center" }}>
+                {k.kat}
+              </span>
+              <div style={{ flex:1 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"3px", fontSize:"0.78rem" }}>
+                  <span style={{ color:"#94a3b8" }}>{k.hisseSayisi} hisse</span>
+                  <span style={{ fontWeight:600, color:"#f1f5f9" }}>%{k.oran.toFixed(1)}</span>
+                </div>
+                <div className="progress-track">
+                  <div className="progress-bar"
+                    style={{ width:`${Math.min(k.oran, 100)}%`, background: kategoriRenk(k.kat) }} />
+                </div>
+              </div>
+              <span style={{ width:"120px", textAlign:"right", fontSize:"0.8rem", color:"#64748b" }}>
+                {k.deger.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {hisseRebalance.length === 0 && (
+        <div className="panel" style={{ marginTop:"1rem", textAlign:"center", color:"#64748b", padding:"2rem" }}>
+          Hiçbir hisseye hedef oran girilmemiş. Hisse detay sayfasından "Hedef Oran %" alanını doldur.
         </div>
       )}
     </div>
