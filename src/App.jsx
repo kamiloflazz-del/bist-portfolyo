@@ -131,6 +131,7 @@ function Navbar({ aktif, setAktif, onIndir, onYukle, sonGuncelleme }) {
   ];
 
   const digerMenuler = [
+    { id: "yeni",      label: "+ Hisse Ekle"        },
     { id: "grafikler", label: "📈 Grafikler"        },
     { id: "performans",label: "📊 Performans"       },
     { id: "rebalance", label: "⚖️ Rebalance"        },
@@ -138,7 +139,6 @@ function Navbar({ aktif, setAktif, onIndir, onYukle, sonGuncelleme }) {
     { id: "halkaarzi", label: "🏦 Halka Arz"        },
     { id: "takvim",    label: "📅 Takvim"           },
     { id: "arsiv",     label: "🗄 Arşiv"            },
-    { id: "yeni",      label: "+ Hisse Ekle"        },
   ];
 
   const tumMenuler = [...anaMenuler, ...digerMenuler];
@@ -475,11 +475,39 @@ function Dashboard({ hisseler, nakit, onHisseClick, sonGuncelleme, takipListe, k
 
 // ─── HİSSE LİSTESİ ───────────────────────────────────────────────────────
 function HisseListe({ hisseler, nakit, onHisseClick }) {
-  const [filtre, setFiltre]       = useState("TUMU");
-  const [siralama, setSiralama]   = useState({ kolon: null, yon: "azalan" });
+  const [filtre, setFiltre]     = useState("TUMU");
+  const [siralama, setSiralama] = useState({ kolon: null, yon: "azalan" });
+  const [kolonSecici, setKolonSecici] = useState(false);
+  const [gorunenKolonlar, setGorunenKolonlar] = useState(
+    ["id","kategori","guncel","gunluk","kzYuzde","kzTutar","tutar","potansiyel","mevcutOran","hedefOran","aksiyon"]
+  );
 
   const toplamVarlik = hisseler.reduce((t, h) => t + h.guncel * h.adet, 0)
     + nakit.tlNakit + nakit.usdFon;
+
+  const TUM_KOLONLAR = [
+    { id:"id",        label:"Hisse"      },
+    { id:"kategori",  label:"Kat."       },
+    { id:"adet",      label:"Adet"       },
+    { id:"alis",      label:"Alış"       },
+    { id:"guncel",    label:"Güncel"     },
+    { id:"gunluk",    label:"Günlük"     },
+    { id:"kzYuzde",   label:"K/Z%"       },
+    { id:"kzTutar",   label:"K/Z TL"     },
+    { id:"tutar",     label:"Tutar"      },
+    { id:"potansiyel",label:"Potansiyel" },
+    { id:"mevcutOran",label:"Mev.%"      },
+    { id:"hedefOran", label:"Hdf.%"      },
+    { id:"aksiyon",   label:"Aksiyon"    },
+  ];
+
+  function kolonToggle(id) {
+    setGorunenKolonlar(prev =>
+      prev.includes(id) ? prev.filter(k => k !== id) : [...prev, id]
+    );
+  }
+
+  function g(id) { return gorunenKolonlar.includes(id); }
 
   const filtrelenmis = filtre === "TUMU"
     ? hisseler
@@ -499,51 +527,19 @@ function HisseListe({ hisseler, nakit, onHisseClick }) {
 
   const siraliHisseler = [...filtrelenmis].sort((a, b) => {
     if (!siralama.kolon) return 0;
-    let av, bv;
     const { kz: akz, kzYuzde: akzY } = karZararHesapla(a);
     const { kz: bkz, kzYuzde: bkzY } = karZararHesapla(b);
-
+    let av, bv;
     switch (siralama.kolon) {
-      case "gunluk":
-        av = parseFloat(a.gunlukDegisim) || 0;
-        bv = parseFloat(b.gunlukDegisim) || 0;
-        break;
-      case "kzYuzde":
-        av = parseFloat(akzY) || 0;
-        bv = parseFloat(bkzY) || 0;
-        break;
-      case "kzTutar":
-        av = akz; bv = bkz;
-        break;
-      case "tutar":
-        av = a.guncel * a.adet;
-        bv = b.guncel * b.adet;
-        break;
-      case "potansiyel":
-        av = a.hedef ? ((a.hedef - a.guncel) / a.guncel * 100) : -999;
-        bv = b.hedef ? ((b.hedef - b.guncel) / b.guncel * 100) : -999;
-        break;
-      
-      case "id":
-        av = a.id; bv = b.id;
-        return siralama.yon === "azalan"
-          ? bv.localeCompare(av, "tr")
-          : av.localeCompare(bv, "tr");
-      case "aksiyon":
-        av = a.aksiyon; bv = b.aksiyon;
-        return siralama.yon === "azalan"
-          ? bv.localeCompare(av, "tr")
-          : av.localeCompare(bv, "tr");
-      
-      case "hedefOran":
-        av = parseFloat(a.hedefOran) || 0;
-        bv = parseFloat(b.hedefOran) || 0;
-        break;
-      
-      case "mevcutOran":
-        av = toplamVarlik > 0 ? (a.guncel * a.adet / toplamVarlik * 100) : 0;
-        bv = toplamVarlik > 0 ? (b.guncel * b.adet / toplamVarlik * 100) : 0;
-        break;
+      case "id":       return siralama.yon === "azalan" ? b.id.localeCompare(a.id,"tr") : a.id.localeCompare(b.id,"tr");
+      case "aksiyon":  return siralama.yon === "azalan" ? b.aksiyon.localeCompare(a.aksiyon,"tr") : a.aksiyon.localeCompare(b.aksiyon,"tr");
+      case "gunluk":   av = parseFloat(a.gunlukDegisim)||0; bv = parseFloat(b.gunlukDegisim)||0; break;
+      case "kzYuzde":  av = parseFloat(akzY)||0; bv = parseFloat(bkzY)||0; break;
+      case "kzTutar":  av = akz; bv = bkz; break;
+      case "tutar":    av = a.guncel*a.adet; bv = b.guncel*b.adet; break;
+      case "potansiyel": av = a.hedef?((a.hedef-a.guncel)/a.guncel*100):-999; bv = b.hedef?((b.hedef-b.guncel)/b.guncel*100):-999; break;
+      case "mevcutOran": av = toplamVarlik>0?(a.guncel*a.adet/toplamVarlik*100):0; bv = toplamVarlik>0?(b.guncel*b.adet/toplamVarlik*100):0; break;
+      case "hedefOran":  av = parseFloat(a.hedefOran)||0; bv = parseFloat(b.hedefOran)||0; break;
       default: return 0;
     }
     return siralama.yon === "azalan" ? bv - av : av - bv;
@@ -552,52 +548,65 @@ function HisseListe({ hisseler, nakit, onHisseClick }) {
   return (
     <div>
       <h2 className="sayfa-baslik">Hisse Listesi</h2>
+
       <div className="filtre-bar">
         {["TUMU","CORE","SATELLITE","SAT","TRADE","PATATES","KUMBARA"].map(f => (
-          <button
-            key={f}
-            className={`filtre-btn ${filtre === f ? "aktif" : ""}`}
-            onClick={() => setFiltre(f)}
-          >
-            {f}
-          </button>
+          <button key={f} className={`filtre-btn ${filtre === f ? "aktif" : ""}`}
+            onClick={() => setFiltre(f)}>{f}</button>
         ))}
       </div>
+
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"0.75rem" }}>
+        <span style={{ fontSize:"0.78rem", color:"#64748b" }}>{filtrelenmis.length} hisse</span>
+        <button className="btn btn-gri" style={{ fontSize:"0.75rem", padding:"3px 10px" }}
+          onClick={() => setKolonSecici(!kolonSecici)}>
+          ⚙ Kolonlar
+        </button>
+      </div>
+
+      {kolonSecici && (
+        <div className="panel" style={{ marginBottom:"0.75rem" }}>
+          <h3 className="panel-baslik">Gösterilecek Kolonlar</h3>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:"6px", marginBottom:"8px" }}>
+            {TUM_KOLONLAR.map(k => (
+              <button key={k.id} onClick={() => kolonToggle(k.id)}
+                style={{
+                  padding:"3px 10px", borderRadius:"4px", border:"none", cursor:"pointer", fontSize:"0.78rem",
+                  background: gorunenKolonlar.includes(k.id) ? "#1d4ed8" : "#2d3748",
+                  color: gorunenKolonlar.includes(k.id) ? "#fff" : "#94a3b8",
+                }}>
+                {k.label}
+              </button>
+            ))}
+          </div>
+          <div style={{ display:"flex", gap:"6px" }}>
+            <button className="btn btn-gri" style={{ fontSize:"0.75rem" }}
+              onClick={() => setGorunenKolonlar(TUM_KOLONLAR.map(k => k.id))}>Tümü</button>
+            <button className="btn btn-gri" style={{ fontSize:"0.75rem" }}
+              onClick={() => setGorunenKolonlar(["id","kategori","guncel","gunluk","kzYuzde","aksiyon"])}>Minimal</button>
+            <button className="btn btn-gri" style={{ fontSize:"0.75rem" }}
+              onClick={() => setGorunenKolonlar(["id","kategori","adet","alis","guncel","gunluk","kzYuzde","kzTutar","aksiyon"])}>Standart</button>
+          </div>
+        </div>
+      )}
+
       <div className="tablo-kap">
         <table className="tablo">
           <thead>
             <tr>
-              <th style={{ cursor:"pointer" }} onClick={() => sirala("id")}>
-                Hisse{siralaIkon("id")}
-              </th>
-              <th>Kat.</th>
-              <th>Adet</th>
-              <th>Alış</th>
-              <th>Güncel</th>
-              <th style={{ cursor:"pointer" }} onClick={() => sirala("gunluk")}>
-                Günlük{siralaIkon("gunluk")}
-              </th>
-              <th style={{ cursor:"pointer" }} onClick={() => sirala("kzYuzde")}>
-                K/Z%{siralaIkon("kzYuzde")}
-              </th>
-              <th style={{ cursor:"pointer" }} onClick={() => sirala("kzTutar")}>
-                K/Z TL{siralaIkon("kzTutar")}
-              </th>
-              <th style={{ cursor:"pointer" }} onClick={() => sirala("tutar")}>
-                Tutar{siralaIkon("tutar")}
-              </th>
-              <th style={{ cursor:"pointer" }} onClick={() => sirala("potansiyel")}>
-                Potansiyel{siralaIkon("potansiyel")}
-              </th>
-              <th style={{ cursor:"pointer" }} onClick={() => sirala("mevcutOran")}>
-                Mev.%{siralaIkon("mevcutOran")}
-              </th>
-              <th style={{ cursor:"pointer" }} onClick={() => sirala("hedefOran")}>
-                Hdf.%{siralaIkon("hedefOran")}
-              </th>
-              <th style={{ cursor:"pointer" }} onClick={() => sirala("aksiyon")}>
-                Aksiyon{siralaIkon("aksiyon")}
-              </th>
+              {g("id")         && <th style={{cursor:"pointer"}} onClick={()=>sirala("id")}>Hisse{siralaIkon("id")}</th>}
+              {g("kategori")   && <th>Kat.</th>}
+              {g("adet")       && <th>Adet</th>}
+              {g("alis")       && <th>Alış</th>}
+              {g("guncel")     && <th>Güncel</th>}
+              {g("gunluk")     && <th style={{cursor:"pointer"}} onClick={()=>sirala("gunluk")}>Günlük{siralaIkon("gunluk")}</th>}
+              {g("kzYuzde")    && <th style={{cursor:"pointer"}} onClick={()=>sirala("kzYuzde")}>K/Z%{siralaIkon("kzYuzde")}</th>}
+              {g("kzTutar")    && <th style={{cursor:"pointer"}} onClick={()=>sirala("kzTutar")}>K/Z TL{siralaIkon("kzTutar")}</th>}
+              {g("tutar")      && <th style={{cursor:"pointer"}} onClick={()=>sirala("tutar")}>Tutar{siralaIkon("tutar")}</th>}
+              {g("potansiyel") && <th style={{cursor:"pointer"}} onClick={()=>sirala("potansiyel")}>Potansiyel{siralaIkon("potansiyel")}</th>}
+              {g("mevcutOran") && <th style={{cursor:"pointer"}} onClick={()=>sirala("mevcutOran")}>Mev.%{siralaIkon("mevcutOran")}</th>}
+              {g("hedefOran")  && <th style={{cursor:"pointer"}} onClick={()=>sirala("hedefOran")}>Hdf.%{siralaIkon("hedefOran")}</th>}
+              {g("aksiyon")    && <th style={{cursor:"pointer"}} onClick={()=>sirala("aksiyon")}>Aksiyon{siralaIkon("aksiyon")}</th>}
             </tr>
           </thead>
           <tbody>
@@ -606,69 +615,47 @@ function HisseListe({ hisseler, nakit, onHisseClick }) {
               const kzPos      = parseFloat(kzYuzde) >= 0;
               const gunluk     = parseFloat(h.gunlukDegisim);
               const tutar      = h.guncel * h.adet;
-              const mevcutOran = toplamVarlik > 0
-                ? ((tutar / toplamVarlik) * 100).toFixed(1)
-                : 0;
+              const mevcutOran = toplamVarlik > 0 ? ((tutar/toplamVarlik)*100).toFixed(1) : 0;
               const potansiyel = h.hedef && h.guncel
-                ? (((h.hedef - h.guncel) / h.guncel) * 100).toFixed(1)
-                : null;
+                ? (((h.hedef-h.guncel)/h.guncel)*100).toFixed(1) : null;
 
               return (
                 <tr key={h.id} className="tablo-satir" onClick={() => onHisseClick(h)}>
-                  <td>
-                    <b>{h.id}</b>
-                    <br />
-                    <span className="kucuk">{h.ad}</span>
-                  </td>
-                  <td>
-                    <span className="kat-badge"
-                      style={{ background: kategoriRenk(h.kategori) }}>
-                      {h.kategori}
-                    </span>
-                  </td>
-                  <td>{h.adet.toLocaleString("tr-TR")}</td>
-                  <td>{h.alis.toFixed(2)}</td>
-                  <td>{h.guncel.toFixed(2)}</td>
-                  <td>
-                    {h.gunlukDegisim != null ? (
-                      <span className={gunluk >= 0 ? "yesil" : "kirmizi"}>
-                        {gunluk >= 0 ? "▲" : "▼"} {Math.abs(gunluk).toFixed(2)}%
-                      </span>
-                    ) : <span style={{ color:"#475569" }}>—</span>}
-                  </td>
-                  <td className={kzPos ? "yesil" : "kirmizi"}>
-                    {kzPos ? "+" : ""}{kzYuzde}%
-                  </td>
-                  <td className={kz >= 0 ? "yesil" : "kirmizi"}>
-                    {kz >= 0 ? "+" : ""}
-                    {kz.toLocaleString("tr-TR", { maximumFractionDigits: 0 })}
-                  </td>
-                  <td>
-                    {tutar.toLocaleString("tr-TR", { maximumFractionDigits: 0 })}
-                  </td>
-                  <td>
-                    {potansiyel ? (
-                      <span className={parseFloat(potansiyel) >= 0 ? "yesil" : "kirmizi"}>
-                        {parseFloat(potansiyel) >= 0 ? "+" : ""}{potansiyel}%
-                      </span>
-                    ) : <span style={{ color:"#475569" }}>—</span>}
-                  </td>
-                  <td>
-                    <span className={
-                      parseFloat(mevcutOran) > (h.hedefOran || 8) ? "kirmizi" : "k0"
-                    }>
-                      %{mevcutOran}
-                    </span>
-                  </td>
-                  <td style={{ color:"#64748b" }}>
-                    %{h.hedefOran || "—"}
-                  </td>
-                  <td>
-                    <span className="ak-badge"
-                      style={{ color: aksiyonRenk(h.aksiyon) }}>
-                      {h.aksiyon}
-                    </span>
-                  </td>
+                  {g("id") && (
+                    <td><b>{h.id}</b><br/><span className="kucuk">{h.ad}</span></td>
+                  )}
+                  {g("kategori") && (
+                    <td><span className="kat-badge" style={{background:kategoriRenk(h.kategori)}}>{h.kategori}</span></td>
+                  )}
+                  {g("adet")    && <td>{h.adet.toLocaleString("tr-TR")}</td>}
+                  {g("alis")    && <td>{h.alis.toFixed(2)}</td>}
+                  {g("guncel")  && <td>{h.guncel.toFixed(2)}</td>}
+                  {g("gunluk")  && (
+                    <td>{h.gunlukDegisim != null
+                      ? <span className={gunluk>=0?"yesil":"kirmizi"}>{gunluk>=0?"▲":"▼"} {Math.abs(gunluk).toFixed(2)}%</span>
+                      : <span style={{color:"#475569"}}>—</span>}
+                    </td>
+                  )}
+                  {g("kzYuzde") && <td className={kzPos?"yesil":"kirmizi"}>{kzPos?"+":""}{kzYuzde}%</td>}
+                  {g("kzTutar") && (
+                    <td className={kz>=0?"yesil":"kirmizi"}>
+                      {kz>=0?"+":""}{kz.toLocaleString("tr-TR",{maximumFractionDigits:0})}
+                    </td>
+                  )}
+                  {g("tutar") && <td>{tutar.toLocaleString("tr-TR",{maximumFractionDigits:0})}</td>}
+                  {g("potansiyel") && (
+                    <td>{potansiyel
+                      ? <span className={parseFloat(potansiyel)>=0?"yesil":"kirmizi"}>{parseFloat(potansiyel)>=0?"+":""}{potansiyel}%</span>
+                      : <span style={{color:"#475569"}}>—</span>}
+                    </td>
+                  )}
+                  {g("mevcutOran") && (
+                    <td><span className={parseFloat(mevcutOran)>(h.hedefOran||8)?"kirmizi":""}>%{mevcutOran}</span></td>
+                  )}
+                  {g("hedefOran") && <td style={{color:"#64748b"}}>%{h.hedefOran||"—"}</td>}
+                  {g("aksiyon")   && (
+                    <td><span className="ak-badge" style={{color:aksiyonRenk(h.aksiyon)}}>{h.aksiyon}</span></td>
+                  )}
                 </tr>
               );
             })}
@@ -948,124 +935,214 @@ function HisseDetay({ hisse, onGuncelle, onGeri, onSil, toplamVarlik }) {
 function HisseEkle({ onEkle, onIptal }) {
   const [form, setForm] = useState({
     id: "", ad: "", adet: "", alis: "", guncel: "",
-    hedef: "", stop: "", kategori: "CORE", aksiyon: "TUT", tez: "", not: ""
+    hedef: "", stop: "", hedefOran: "", kategori: "CORE",
+    aksiyon: "TUT", tez: "", riskler: "", not: "",
+    finansal: {
+      gecmisNetKar:"", gelecekNetKar:"",
+      gecmisFavok:"", gelecekFavok:"",
+      gecmisFavokMarj:"", gelecekFavokMarj:"",
+      gecmisFk:"", gelecekFk:"",
+    }
   });
+  const [sekme, setSekme] = useState("temel");
 
   function guncelle(key, val) {
     setForm(prev => ({ ...prev, [key]: val }));
   }
 
+  function finansalGuncelle(key, val) {
+    setForm(prev => ({ ...prev, finansal: { ...prev.finansal, [key]: val } }));
+  }
+
   function ekle() {
     if (!form.id.trim() || !form.ad.trim() || !form.adet || !form.alis || !form.guncel) {
-      alert("Sembol, Şirket Adı, Adet, Alış ve Güncel fiyat zorunlu.");
+      alert("Temel bilgiler sekmesindeki * alanları doldur.");
       return;
     }
     onEkle({
-      id:       form.id.toUpperCase().trim(),
-      ad:       form.ad.trim(),
-      adet:     parseInt(form.adet),
-      alis:     parseFloat(form.alis),
-      guncel:   parseFloat(form.guncel),
-      hedef:    parseFloat(form.hedef) || 0,
-      stop:     parseFloat(form.stop)  || 0,
-      kategori: form.kategori,
-      aksiyon:  form.aksiyon,
-      tez:      form.tez,
-      not:      form.not,
+      id:        form.id.toUpperCase().trim(),
+      ad:        form.ad.trim(),
+      adet:      parseInt(form.adet),
+      alis:      parseFloat(form.alis),
+      guncel:    parseFloat(form.guncel),
+      hedef:     parseFloat(form.hedef) || 0,
+      stop:      parseFloat(form.stop)  || 0,
+      hedefOran: parseFloat(form.hedefOran) || 0,
+      kategori:  form.kategori,
+      aksiyon:   form.aksiyon,
+      tez:       form.tez,
+      riskler:   form.riskler,
+      not:       form.not,
+      finansal:  form.finansal,
     });
   }
+
+  const SEKMELER = [
+    { id:"temel",   label:"📋 Temel"    },
+    { id:"strateji",label:"🎯 Strateji" },
+    { id:"finansal",label:"📊 Finansal" },
+  ];
 
   return (
     <div>
       <h2 className="sayfa-baslik">+ Yeni Hisse Ekle</h2>
+
+      {/* Sekme Butonları */}
+      <div style={{ display:"flex", gap:"6px", marginBottom:"1rem" }}>
+        {SEKMELER.map(s => (
+          <button key={s.id}
+            className={`filtre-btn ${sekme === s.id ? "aktif" : ""}`}
+            onClick={() => setSekme(s.id)}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+
       <div className="panel">
-        <div className="form-grid" style={{ marginBottom: "1rem" }}>
 
-          <label className="form-label">
-            Sembol *
-            <input className="input" type="text" placeholder="örn: THYAO"
-              value={form.id} onChange={e => guncelle("id", e.target.value)} />
-          </label>
+        {/* TEMEL BİLGİLER */}
+        {sekme === "temel" && (
+          <div>
+            <div className="form-grid" style={{ marginBottom:"1rem" }}>
+              <label className="form-label">
+                Sembol *
+                <input className="input" type="text" placeholder="örn: THYAO"
+                  value={form.id} onChange={e => guncelle("id", e.target.value.toUpperCase())} />
+              </label>
+              <label className="form-label">
+                Şirket Adı *
+                <input className="input" type="text"
+                  value={form.ad} onChange={e => guncelle("ad", e.target.value)} />
+              </label>
+              <label className="form-label">
+                Adet *
+                <input className="input" type="number"
+                  value={form.adet} onChange={e => guncelle("adet", e.target.value)} />
+              </label>
+              <label className="form-label">
+                Alış Fiyatı (TL) *
+                <input className="input" type="number" step="0.01"
+                  value={form.alis} onChange={e => guncelle("alis", e.target.value)} />
+              </label>
+              <label className="form-label">
+                Güncel Fiyat (TL) *
+                <input className="input" type="number" step="0.01"
+                  value={form.guncel} onChange={e => guncelle("guncel", e.target.value)} />
+              </label>
+              <label className="form-label">
+                Hedef Fiyat (TL)
+                <input className="input" type="number" step="0.01"
+                  value={form.hedef} onChange={e => guncelle("hedef", e.target.value)} />
+              </label>
+              <label className="form-label">
+                Stop-Loss (TL)
+                <input className="input" type="number" step="0.01"
+                  value={form.stop} onChange={e => guncelle("stop", e.target.value)} />
+              </label>
+              <label className="form-label">
+                Hedef Oran %
+                <input className="input" type="number" step="0.1"
+                  value={form.hedefOran} onChange={e => guncelle("hedefOran", e.target.value)} />
+              </label>
+              <label className="form-label">
+                Kategori
+                <select className="input" value={form.kategori}
+                  onChange={e => guncelle("kategori", e.target.value)}>
+                  <option value="CORE">CORE</option>
+                  <option value="SATELLITE">SATELLITE</option>
+                  <option value="SAT">SAT</option>
+                  <option value="TRADE">TRADE</option>
+                  <option value="PATATES">PATATES</option>
+                  <option value="KUMBARA">KUMBARA</option>
+                </select>
+              </label>
+              <label className="form-label">
+                Aksiyon
+                <select className="input" value={form.aksiyon}
+                  onChange={e => guncelle("aksiyon", e.target.value)}>
+                  <option value="TUT">TUT</option>
+                  <option value="EKLE">EKLE</option>
+                  <option value="SAT">SAT</option>
+                </select>
+              </label>
+            </div>
+            {form.adet && form.alis && (
+              <div style={{ fontSize:"0.82rem", color:"#94a3b8", marginBottom:"1rem" }}>
+                Toplam maliyet: <b style={{ color:"#f1f5f9" }}>
+                  {(parseInt(form.adet||0) * parseFloat(form.alis||0)).toLocaleString("tr-TR",{maximumFractionDigits:0})} TL
+                </b>
+              </div>
+            )}
+          </div>
+        )}
 
-          <label className="form-label">
-            Şirket Adı *
-            <input className="input" type="text" placeholder="örn: Türk Hava Yolları"
-              value={form.ad} onChange={e => guncelle("ad", e.target.value)} />
-          </label>
+        {/* STRATEJİ */}
+        {sekme === "strateji" && (
+          <div>
+            <label className="form-label" style={{ display:"block", marginBottom:"0.75rem" }}>
+              💡 Yatırım Tezi
+              <textarea className="input-alan" rows={4}
+                placeholder="Neden bu hisseyi aldın? Temel/teknik analiz..."
+                value={form.tez} onChange={e => guncelle("tez", e.target.value)} />
+            </label>
+            <label className="form-label" style={{ display:"block", marginBottom:"0.75rem" }}>
+              ⚠️ Riskler
+              <textarea className="input-alan" rows={3}
+                placeholder="Olası riskler, dikkat edilmesi gerekenler..."
+                value={form.riskler} onChange={e => guncelle("riskler", e.target.value)} />
+            </label>
+            <label className="form-label" style={{ display:"block" }}>
+              📝 Not
+              <textarea className="input-alan" rows={2}
+                placeholder="Ek notlar..."
+                value={form.not} onChange={e => guncelle("not", e.target.value)} />
+            </label>
+          </div>
+        )}
 
-          <label className="form-label">
-            Adet *
-            <input className="input" type="number"
-              value={form.adet} onChange={e => guncelle("adet", e.target.value)} />
-          </label>
+        {/* FİNANSAL */}
+        {sekme === "finansal" && (
+          <div>
+            <p style={{ color:"#64748b", fontSize:"0.82rem", marginBottom:"1rem" }}>
+              Geçmiş dönem verileri ve gelecek beklentilerini gir.
+            </p>
+            <table className="tablo">
+              <thead>
+                <tr>
+                  <th>Gösterge</th>
+                  <th>Geçmiş Dönem</th>
+                  <th>Gelecek Beklenti</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { label:"Net Kâr",    g:"gecmisNetKar",    gl:"gelecekNetKar"    },
+                  { label:"FAVÖK",      g:"gecmisFavok",     gl:"gelecekFavok"     },
+                  { label:"FAVÖK Marjı",g:"gecmisFavokMarj", gl:"gelecekFavokMarj" },
+                  { label:"F/K",        g:"gecmisFk",        gl:"gelecekFk"        },
+                ].map(({ label, g: gk, gl }) => (
+                  <tr key={label}>
+                    <td style={{ fontWeight:600, color:"#94a3b8" }}>{label}</td>
+                    <td>
+                      <input className="input" type="text"
+                        style={{ padding:"4px 8px" }}
+                        value={form.finansal[gk] || ""}
+                        onChange={e => finansalGuncelle(gk, e.target.value)} />
+                    </td>
+                    <td>
+                      <input className="input" type="text"
+                        style={{ padding:"4px 8px" }}
+                        value={form.finansal[gl] || ""}
+                        onChange={e => finansalGuncelle(gl, e.target.value)} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
 
-          <label className="form-label">
-            Alış Fiyatı (TL) *
-            <input className="input" type="number" step="0.01"
-              value={form.alis} onChange={e => guncelle("alis", e.target.value)} />
-          </label>
-
-          <label className="form-label">
-            Güncel Fiyat (TL) *
-            <input className="input" type="number" step="0.01"
-              value={form.guncel} onChange={e => guncelle("guncel", e.target.value)} />
-          </label>
-
-          <label className="form-label">
-            Hedef Fiyat (TL)
-            <input className="input" type="number" step="0.01"
-              value={form.hedef} onChange={e => guncelle("hedef", e.target.value)} />
-          </label>
-
-          <label className="form-label">
-            Stop-Loss (TL)
-            <input className="input" type="number" step="0.01"
-              value={form.stop} onChange={e => guncelle("stop", e.target.value)} />
-          </label>
-
-          <label className="form-label">
-            Kategori
-            <select className="input" value={form.kategori}
-              onChange={e => guncelle("kategori", e.target.value)}>
-              <option value="CORE">CORE</option>
-              <option value="SATELLITE">SATELLITE</option>
-              <option value="SAT">SAT</option>
-              <option value="TRADE">TRADE</option>
-              <option value="PATATES">PATATES</option>
-              <option value="KUMBARA">KUMBARA</option>
-            </select>
-          </label>
-
-          <label className="form-label">
-            Aksiyon
-            <select className="input" value={form.aksiyon}
-              onChange={e => guncelle("aksiyon", e.target.value)}>
-              <option value="TUT">TUT</option>
-              <option value="EKLE">EKLE</option>
-              <option value="SAT">SAT</option>
-              <option value="BEKLE">BEKLE</option>
-              <option value="DUZELTME BEKLE">DUZELTMEBEKLE</option>
-              <option value="YENI ALIM YOK">YENIALIMYOK</option>
-            </select>
-          </label>
-
-        </div>
-
-        <label className="form-label" style={{ display: "block", marginBottom: "0.75rem" }}>
-          Yatırım Tezi
-          <textarea className="input-alan" rows={3}
-            placeholder="Neden bu hisseyi aldın?"
-            value={form.tez} onChange={e => guncelle("tez", e.target.value)} />
-        </label>
-
-        <label className="form-label" style={{ display: "block", marginBottom: "1.25rem" }}>
-          Not
-          <textarea className="input-alan" rows={2}
-            placeholder="Ek not..."
-            value={form.not} onChange={e => guncelle("not", e.target.value)} />
-        </label>
-
-        <div className="btn-grup">
+        <div className="btn-grup" style={{ marginTop:"1.25rem" }}>
           <button className="btn btn-yesil" onClick={ekle}>✓ Hisse Ekle</button>
           <button className="btn btn-gri" onClick={onIptal}>← İptal</button>
         </div>
@@ -1315,93 +1392,63 @@ function FiyatGuncelle({ hisseler, onKaydet, onIptal, onFiyatCek, fiyatYukleniyo
     </div>
   );
 }
+
 // ─── ANA UYGULAMA ─────────────────────────────────────────────────────────
 export default function App() {
-  const [girisYapildi, setGirisYapildi] = useState(girisKontrol);
-  const [hisseler,    setHisseler]    = useState([]);
-  const [nakit,       setNakit]       = useState(BASLANGIC_NAKIT);
-  const [aktifSayfa,  setAktifSayfa]  = useState("dashboard");
-  const [seciliHisse, setSeciliHisse] = useState(null);
+  const [girisYapildi,    setGirisYapildi]    = useState(girisKontrol);
+  const [hisseler,        setHisseler]        = useState([]);
+  const [nakit,           setNakit]           = useState(BASLANGIC_NAKIT);
+  const [aktifSayfa,      setAktifSayfa]      = useState("dashboard");
+  const [seciliHisse,     setSeciliHisse]     = useState(null);
   const [fiyatYukleniyor, setFiyatYukleniyor] = useState(false);
-  const [sonGuncelleme, setSonGuncelleme] = useState(
-    localStorage.getItem("son_guncelleme") || null
-  );
-  const [snapshots, setSnapshots] = useState([]);
+  const [sonGuncelleme,   setSonGuncelleme]   = useState(localStorage.getItem("son_guncelleme") || null);
+  const [yukleniyor,      setYukleniyor]      = useState(true);
+  const [snapshots,       setSnapshots]       = useState([]);
+  const [arsiv,           setArsiv]           = useState([]);
+  const [takipListe,      setTakipListe]      = useState([]);
+  const [alarmGecmisi,    setAlarmGecmisi]    = useState([]);
+  const [bildirimler,     setBildirimler]     = useState([]);
 
-  useEffect(() => {
-    snapshotOku().then(setSnapshots);
-  }, []);
-  const [arsiv, setArsiv] = useState([]);
+  // ── Firebase yüklemeleri ──────────────────────────────────────────────
+  useEffect(() => { snapshotOku().then(setSnapshots);     }, []);
+  useEffect(() => { arsivOku().then(setArsiv);            }, []);
+  useEffect(() => { takipOku().then(setTakipListe);       }, []);
+  useEffect(() => { alarmGecmisiOku().then(setAlarmGecmisi); }, []);
 
-  useEffect(() => {
-    arsivOku().then(setArsiv);
-  }, []);
-  const [yukleniyor, setYukleniyor] = useState(true);
-  const [takipListe, setTakipListe] = useState([]);
-  const [alarmGecmisi, setAlarmGecmisi] = useState([]);
-
-  useEffect(() => {
-    takipOku().then(setTakipListe);
-  }, []);
-
-  useEffect(() => {
-    alarmGecmisiOku().then(setAlarmGecmisi);
-  }, []);
-
-  useEffect(() => {
-    takipOku().then(setTakipListe);
-  }, []);
-
-  
-  // Otomatik fiyat güncelleme — borsa saatlerinde her 15 dakika
+  // ── Otomatik fiyat güncelleme — borsa saatlerinde her 15 dakika ───────
   useEffect(() => {
     function borsaAcikMi() {
       const simdi = new Date();
-      const gun = simdi.getDay(); // 0=Pazar, 6=Cumartesi
-      const saat = simdi.getHours();
-      const dakika = simdi.getMinutes();
-      const toplamDakika = saat * 60 + dakika;
-      // Hafta içi, 10:00-18:00 arası
+      const gun = simdi.getDay();
+      const toplamDakika = simdi.getHours() * 60 + simdi.getMinutes();
       return gun >= 1 && gun <= 5 && toplamDakika >= 600 && toplamDakika <= 1080;
     }
-
     const interval = setInterval(() => {
-      if (borsaAcikMi()) {
-        console.log("Otomatik fiyat güncelleme...");
-        fiyatlariCek();
-      }
-    }, 15 * 60 * 1000); // 15 dakika
-
+      if (borsaAcikMi()) fiyatlariCek();
+    }, 15 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 
-  // Günlük snapshot — her gün bir kez portföy değerini kaydet
+  // ── Günlük snapshot ───────────────────────────────────────────────────
   useEffect(() => {
     if (yukleniyor || hisseler.length === 0) return;
-
     const bugun = new Date().toISOString().split("T")[0];
-    const sonSnapshot = snapshots[0]?.tarih;
-
-    if (sonSnapshot === bugun) return; // Bugün zaten alındı
-
-    const toplamHisse = hisseler.reduce((t, h) => t + h.guncel * h.adet, 0);
+    if (snapshots[0]?.tarih === bugun) return;
+    const toplamHisse  = hisseler.reduce((t, h) => t + h.guncel * h.adet, 0);
     const toplamVarlik = toplamHisse + nakit.tlNakit + nakit.usdFon;
-
     const yeniSnapshot = {
       tarih: bugun,
       toplamVarlik: parseFloat(toplamVarlik.toFixed(0)),
-      toplamHisse: parseFloat(toplamHisse.toFixed(0)),
-      tlNakit: nakit.tlNakit,
-      usdFon: nakit.usdFon,
+      toplamHisse:  parseFloat(toplamHisse.toFixed(0)),
+      tlNakit:      nakit.tlNakit,
+      usdFon:       nakit.usdFon,
     };
-
-    const yeniListe = [yeniSnapshot, ...snapshots].slice(0, 365); // Max 1 yıl
+    const yeniListe = [yeniSnapshot, ...snapshots].slice(0, 365);
     setSnapshots(yeniListe);
     snapshotYaz(yeniListe);
-    console.log("Snapshot alındı:", bugun, toplamVarlik);
   }, [yukleniyor, hisseler]);
-  
-  // Firebase'den veri yükle
+
+  // ── Firebase gerçek zamanlı dinleyici ────────────────────────────────
   useEffect(() => {
     let ilkYukleme = true;
     const timeout = setTimeout(() => setYukleniyor(false), 5000);
@@ -1412,45 +1459,31 @@ export default function App() {
         if (!mevcutVeri || mevcutVeri.length === 0) {
           await portfoyYaz(BASLANGIC_PORTFOY);
         }
-      } catch(e) {
-        console.error("Başlangıç yazma hatası:", e);
-      }
+      } catch(e) { console.error("Başlangıç yazma hatası:", e); }
 
       const portfoyDur = portfoyDinle((gelenHisseler) => {
-        if (gelenHisseler && gelenHisseler.length > 0) {
-          setHisseler(gelenHisseler);
-        }
-        if (ilkYukleme) {
-          setYukleniyor(false);
-          ilkYukleme = false;
-        }
+        if (gelenHisseler && gelenHisseler.length > 0) setHisseler(gelenHisseler);
+        if (ilkYukleme) { setYukleniyor(false); ilkYukleme = false; }
       });
 
       const nakitDur = nakitDinle((gelenNakit) => {
         if (gelenNakit) setNakit(gelenNakit);
       });
 
-      return () => {
-        portfoyDur();
-        nakitDur();
-      };
+      return () => { portfoyDur(); nakitDur(); };
     }
 
     baslat();
     return () => clearTimeout(timeout);
   }, []);
 
+  // ── Fiyat Çekme ───────────────────────────────────────────────────────
   async function fiyatlariCek(onBitti) {
     setFiyatYukleniyor(true);
     try {
-      const portfoyIds = hisseler.map(h => h.id);
-      const takipIds = takipListe.map(h => h.id);
-      const tumIds = [...new Set([...portfoyIds, ...takipIds])];
-      const semboller = tumIds.join(",");
-
-      const yanit = await fetch(`${PROXY_URL}/api/fiyat?semboller=${semboller}`);
-      const veri = await yanit.json();
-
+      const tumIds   = [...new Set([...hisseler.map(h => h.id), ...takipListe.map(h => h.id)])];
+      const yanit    = await fetch(`${PROXY_URL}/api/fiyat?semboller=${tumIds.join(",")}`);
+      const veri     = await yanit.json();
       const yeniFiyatlar = {};
       let guncellenenSayisi = 0;
 
@@ -1459,36 +1492,21 @@ export default function App() {
         if (d?.fiyat) {
           guncellenenSayisi++;
           yeniFiyatlar[h.id] = d.fiyat;
-          return {
-            ...h,
-            guncel:        d.fiyat,
-            oncekiKapanis: d.oncekiKapanis  ?? h.oncekiKapanis  ?? null,
-            gunlukDegisim: d.gunlukDegisim  ?? h.gunlukDegisim  ?? null,
-          };
+          return { ...h, guncel: d.fiyat, oncekiKapanis: d.oncekiKapanis ?? h.oncekiKapanis ?? null, gunlukDegisim: d.gunlukDegisim ?? h.gunlukDegisim ?? null };
         }
         yeniFiyatlar[h.id] = h.guncel;
         return h;
       });
 
-      console.log("Takip liste:", takipListe);
-      console.log("Veri:", veri);
-
-      // Takip listesini de güncelle ve alarm kontrol et
+      // Takip listesi güncelle + alarm kontrol
       setTakipListe(prev => {
         if (!prev || prev.length === 0) return prev;
-        const yeniTakip = prev.map(h => {
-          if (veri[h.id]?.fiyat) {
-            return {
-              ...h,
-              guncel: veri[h.id].fiyat.toString(),
-              gunlukDegisim: veri[h.id].gunlukDegisim,
-            };
-          }
-          return h;
-        });
+        const yeniTakip = prev.map(h => veri[h.id]?.fiyat
+          ? { ...h, guncel: veri[h.id].fiyat.toString(), gunlukDegisim: veri[h.id].gunlukDegisim }
+          : h
+        );
         takipYaz(yeniTakip);
 
-        // Alarm geçmişi kontrol
         const guncelZaman = Date.now();
         const yeniAlarmlar = [];
 
@@ -1497,33 +1515,24 @@ export default function App() {
           if (!guncel || !h.alarmlar) return;
           const { direncAl, destekAl, destekSat, direncSat } = h.alarmlar;
 
-          const kontrolEt = (alarm, tip, tetiklendi) => {
+          const kontrol = (alarm, tip, tetiklendi) => {
             if (!alarm?.aktif || !alarm?.fiyat || !tetiklendi) return;
-            // Son 1 saatte aynı alarm var mı?
             const sonBirSaat = guncelZaman - 60 * 60 * 1000;
-            const mevcutVar = alarmGecmisi.some(a =>
-              a.hisseId === h.id && a.tip === tip &&
-              new Date(a.zaman).getTime() > sonBirSaat
+            const mevcutVar  = alarmGecmisi.some(a =>
+              a.hisseId === h.id && a.tip === tip && new Date(a.zaman).getTime() > sonBirSaat
             );
-            if (!mevcutVar) {
-              yeniAlarmlar.push({
-                id: `${h.id}_${tip}_${guncelZaman}`,
-                hisseId: h.id,
-                hisseAd: h.ad,
-                tip,
-                alarmFiyat: alarm.fiyat,
-                guncelFiyat: h.guncel,
-                not: alarm.not || "",
-                zaman: new Date().toISOString(),
-                okundu: false,
-              });
-            }
+            if (!mevcutVar) yeniAlarmlar.push({
+              id: `${h.id}_${tip}_${guncelZaman}`,
+              hisseId: h.id, hisseAd: h.ad, tip,
+              alarmFiyat: alarm.fiyat, guncelFiyat: h.guncel,
+              not: alarm.not || "", zaman: new Date().toISOString(), okundu: false,
+            });
           };
 
-          kontrolEt(direncAl,   "direncAl",  guncel >= parseFloat(direncAl?.fiyat));
-          kontrolEt(destekAl,   "destekAl",  guncel <= parseFloat(destekAl?.fiyat));
-          kontrolEt(destekSat,  "destekSat", guncel <= parseFloat(destekSat?.fiyat));
-          kontrolEt(direncSat,  "direncSat", guncel >= parseFloat(direncSat?.fiyat));
+          kontrol(direncAl,  "direncAl",  guncel >= parseFloat(direncAl?.fiyat));
+          kontrol(destekAl,  "destekAl",  guncel <= parseFloat(destekAl?.fiyat));
+          kontrol(destekSat, "destekSat", guncel <= parseFloat(destekSat?.fiyat));
+          kontrol(direncSat, "direncSat", guncel >= parseFloat(direncSat?.fiyat));
         });
 
         if (yeniAlarmlar.length > 0) {
@@ -1532,6 +1541,19 @@ export default function App() {
             alarmGecmisiYaz(guncellenmis);
             return guncellenmis;
           });
+          setBildirimler(prev => [
+            ...yeniAlarmlar.map(a => ({
+              id: a.id,
+              mesaj: `${a.hisseId} — ${
+                a.tip === "direncAl"  ? "📈 Direnç AL"  :
+                a.tip === "destekAl"  ? "💙 Destek AL"  :
+                a.tip === "destekSat" ? "📉 Destek SAT" : "⚠️ Direnç SAT"
+              } (${a.alarmFiyat} TL)`,
+              renk: a.tip === "direncAl" ? "#22c55e" : a.tip === "destekAl" ? "#38bdf8" : a.tip === "destekSat" ? "#ef4444" : "#f59e0b",
+              zaman: Date.now(),
+            })),
+            ...prev,
+          ].slice(0, 5));
         }
 
         return yeniTakip;
@@ -1552,16 +1574,12 @@ export default function App() {
     }
   }
 
-  // Giriş kontrolü — tüm hook'lardan SONRA
+  // ── Yükleniyor / Giriş ekranları ─────────────────────────────────────
   if (yukleniyor) {
     return (
-      <div style={{
-        minHeight: "100vh", display: "flex",
-        alignItems: "center", justifyContent: "center",
-        background: "#0f1117", flexDirection: "column", gap: "1rem"
-      }}>
-        <div style={{ fontSize: "2rem" }}>📈</div>
-        <div style={{ color: "#64748b", fontSize: "0.9rem" }}>Veriler yükleniyor...</div>
+      <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", background:"#0f1117", flexDirection:"column", gap:"1rem" }}>
+        <div style={{ fontSize:"2rem" }}>📈</div>
+        <div style={{ color:"#64748b", fontSize:"0.9rem" }}>Veriler yükleniyor...</div>
       </div>
     );
   }
@@ -1569,6 +1587,7 @@ export default function App() {
     return <GirisEkrani onGiris={() => setGirisYapildi(true)} />;
   }
 
+  // ── Yardımcı fonksiyonlar ─────────────────────────────────────────────
   function hisseGuncelle(id, yeniVeri) {
     setHisseler(prev => {
       const yeni = prev.map(h => h.id === id ? { ...h, ...yeniVeri } : h);
@@ -1584,31 +1603,23 @@ export default function App() {
       const { kz, kzYuzde } = karZararHesapla(hisse);
       const arsivKaydi = {
         ...hisse,
-        cikisTarihi: new Date().toISOString().split("T")[0],
-        cikisKZ: parseFloat(kz.toFixed(0)),
-        cikisKZYuzde: kzYuzde,
-        cikisFiyati: hisse.guncel,
+        cikisTarihi:    new Date().toISOString().split("T")[0],
+        cikisKZ:        parseFloat(kz.toFixed(0)),
+        cikisKZYuzde:   kzYuzde,
+        cikisFiyati:    hisse.guncel,
       };
-      setArsiv(prev => {
-        const yeniArsiv = [arsivKaydi, ...prev];
-        arsivYaz(yeniArsiv);
-        return yeniArsiv;
-      });
+      setArsiv(prev => { const y = [arsivKaydi, ...prev]; arsivYaz(y); return y; });
     }
-    setHisseler(prev => {
-      const yeni = prev.filter(h => h.id !== id);
-      portfoyYaz(yeni);
-      return yeni;
-    });
+    setHisseler(prev => { const y = prev.filter(h => h.id !== id); portfoyYaz(y); return y; });
   }
 
   function veriIndir() {
     const veri = { hisseler, nakit, tarih: new Date().toISOString() };
-    const blob = new Blob([JSON.stringify(veri, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(veri, null, 2)], { type:"application/json" });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement("a");
     a.href     = url;
-    a.download = `bist-portfoy-${new Date().toLocaleDateString("tr-TR").replace(/\./g, "-")}.json`;
+    a.download = `bist-portfoy-${new Date().toLocaleDateString("tr-TR").replace(/\./g,"-")}.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -1620,20 +1631,17 @@ export default function App() {
     reader.onload = async (ev) => {
       try {
         const veri = JSON.parse(ev.target.result);
-        if (veri.hisseler) {
-          setHisseler(veri.hisseler);
-          await portfoyYaz(veri.hisseler);
-        }
-        if (veri.nakit) {
-          setNakit(veri.nakit);
-          await nakitYaz(veri.nakit);
-        }
+        if (veri.hisseler) { setHisseler(veri.hisseler); await portfoyYaz(veri.hisseler); }
+        if (veri.nakit)    { setNakit(veri.nakit);       await nakitYaz(veri.nakit);      }
         alert("Veri başarıyla yüklendi ve Firebase'e kaydedildi!");
       } catch { alert("Dosya okunamadı."); }
     };
     reader.readAsText(file);
   }
 
+  const toplamVarlik = hisseler.reduce((t, h) => t + h.guncel * h.adet, 0) + nakit.tlNakit + nakit.usdFon;
+
+  // ── Render ────────────────────────────────────────────────────────────
   return (
     <div className="app">
       <Navbar
@@ -1669,10 +1677,7 @@ export default function App() {
             onGuncelle={hisseGuncelle}
             onGeri={() => setAktifSayfa("liste")}
             onSil={(id) => { hisseSil(id); setAktifSayfa("liste"); }}
-            toplamVarlik={
-              hisseler.reduce((t, h) => t + h.guncel * h.adet, 0) +
-              nakit.tlNakit + nakit.usdFon
-            }
+            toplamVarlik={toplamVarlik}
           />
         )}
 
@@ -1686,13 +1691,10 @@ export default function App() {
               setAlarmGecmisi(yeni);
               alarmGecmisiYaz(yeni);
             }}
-            onTumAlarmSil={() => {
-              setAlarmGecmisi([]);
-              alarmGecmisiYaz([]);
-            }}
+            onTumAlarmSil={() => { setAlarmGecmisi([]); alarmGecmisiYaz([]); }}
           />
         )}
-        
+
         {aktifSayfa === "guncelle" && (
           <FiyatGuncelle
             hisseler={hisseler}
@@ -1707,29 +1709,13 @@ export default function App() {
           />
         )}
 
-        {aktifSayfa === "performans" && (
-          <PerformansTakibi snapshots={snapshots} />
-        )}
-
-        {aktifSayfa === "rebalance" && (
-          <Rebalancing hisseler={hisseler} nakit={nakit} />
-        )}
-
-        {aktifSayfa === "gunce" && (
-          <Gunce hisseler={hisseler} />
-        )}
-
-        {aktifSayfa === "halkaarzi" && (
-          <HalkaArz />
-        )}
-
-        {aktifSayfa === "grafikler" && (
-          <Grafikler hisseler={hisseler} nakit={nakit} />
-        )}
-
-        {aktifSayfa === "takvim" && (
-          <BilancTakvim hisseler={hisseler} onGuncelle={hisseGuncelle} />
-        )}
+        {aktifSayfa === "performans" && <PerformansTakibi snapshots={snapshots} />}
+        {aktifSayfa === "rebalance"  && <Rebalancing hisseler={hisseler} nakit={nakit} />}
+        {aktifSayfa === "gunce"      && <Gunce hisseler={hisseler} />}
+        {aktifSayfa === "halkaarzi"  && <HalkaArz />}
+        {aktifSayfa === "grafikler"  && <Grafikler hisseler={hisseler} nakit={nakit} />}
+        {aktifSayfa === "takvim"     && <BilancTakvim hisseler={hisseler} onGuncelle={hisseGuncelle} />}
+        {aktifSayfa === "nakit"      && <NakitYonetim nakit={nakit} onNakitGuncelle={setNakit} />}
 
         {aktifSayfa === "arsiv" && (
           <ArsivSayfasi
@@ -1752,14 +1738,37 @@ export default function App() {
           />
         )}
 
-        {aktifSayfa === "nakit" && (
-          <NakitYonetim
-            nakit={nakit}
-            onNakitGuncelle={setNakit}
-          />
-        )}
-
       </main>
+
+      {/* ── Uygulama içi bildirimler ── */}
+      {bildirimler.length > 0 && (
+        <div style={{
+          position:"fixed", bottom:"1rem", right:"1rem", zIndex:1000,
+          display:"flex", flexDirection:"column", gap:"6px", maxWidth:"320px"
+        }}>
+          {bildirimler.map(b => (
+            <div key={b.id} style={{
+              background:"#1e2330", border:`1px solid ${b.renk}`,
+              borderRadius:"8px", padding:"10px 14px",
+              boxShadow:"0 4px 16px rgba(0,0,0,0.4)",
+              display:"flex", justifyContent:"space-between", alignItems:"center", gap:"8px"
+            }}>
+              <span style={{ fontSize:"0.82rem", color:"#f1f5f9" }}>{b.mesaj}</span>
+              <button
+                onClick={() => setBildirimler(prev => prev.filter(x => x.id !== b.id))}
+                style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", flexShrink:0 }}>
+                ✕
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={() => setBildirimler([])}
+            style={{ background:"#2d3748", border:"none", borderRadius:"6px", color:"#94a3b8", cursor:"pointer", padding:"4px", fontSize:"0.75rem" }}>
+            Tümünü Kapat
+          </button>
+        </div>
+      )}
+
     </div>
   );
 }
@@ -3049,16 +3058,15 @@ function PerformansTakibi({ snapshots }) {
   const [filtre, setFiltre] = useState("30");
 
   const gunSayisi = parseInt(filtre);
-  const filtrelenmis = [...snapshots]
-    .reverse()
-    .slice(-gunSayisi);
+  const sirali = [...snapshots].reverse();
+  const filtrelenmis = sirali.slice(-gunSayisi);
 
   if (filtrelenmis.length === 0) {
     return (
       <div>
         <h2 className="sayfa-baslik">📊 Performans Takibi</h2>
         <div className="panel" style={{ textAlign:"center", color:"#64748b", padding:"2rem" }}>
-          Henüz snapshot yok. Yarın tekrar bak — her gün otomatik kayıt alınıyor.
+          Henüz snapshot yok. Her gün otomatik kayıt alınıyor — yarın tekrar bak.
         </div>
       </div>
     );
@@ -3068,8 +3076,14 @@ function PerformansTakibi({ snapshots }) {
   const son = filtrelenmis[filtrelenmis.length - 1]?.toplamVarlik || 0;
   const degisim = son - ilk;
   const degisimYuzde = ilk > 0 ? ((degisim / ilk) * 100).toFixed(2) : 0;
-  const maxDeger = Math.max(...filtrelenmis.map(s => s.toplamVarlik));
-  const minDeger = Math.min(...filtrelenmis.map(s => s.toplamVarlik));
+
+  // Recharts için veri hazırla
+  const grafikVeri = filtrelenmis.map(s => ({
+    tarih: new Date(s.tarih).toLocaleDateString("tr-TR", { day:"2-digit", month:"2-digit" }),
+    "Toplam Varlık": s.toplamVarlik,
+    "Hisse Değeri":  s.toplamHisse,
+    "TL Nakit":      s.tlNakit,
+  }));
 
   return (
     <div>
@@ -3094,13 +3108,13 @@ function PerformansTakibi({ snapshots }) {
       {/* Özet Kartlar */}
       <div className="kart-grid" style={{ marginBottom:"1rem" }}>
         <div className="kart">
-          <div className="kart-label">Başlangıç Değeri</div>
+          <div className="kart-label">Başlangıç</div>
           <div className="kart-deger">
             {ilk.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL
           </div>
         </div>
         <div className="kart">
-          <div className="kart-label">Güncel Değer</div>
+          <div className="kart-label">Güncel</div>
           <div className="kart-deger">
             {son.toLocaleString("tr-TR", { maximumFractionDigits:0 })} TL
           </div>
@@ -3114,54 +3128,63 @@ function PerformansTakibi({ snapshots }) {
           </div>
         </div>
         <div className="kart">
-          <div className="kart-label">Snapshot Sayısı</div>
+          <div className="kart-label">Kayıt Sayısı</div>
           <div className="kart-deger">{filtrelenmis.length} gün</div>
         </div>
       </div>
 
-      {/* Grafik */}
+      {/* Ana Grafik — CSS */}
       <div className="panel" style={{ marginBottom:"1rem" }}>
-        <h3 className="panel-baslik">Portföy Değeri Zaman Serisi</h3>
-        <div style={{ overflowX:"auto" }}>
-          <div style={{ minWidth:"600px", padding:"1rem 0" }}>
-            <svg viewBox={`0 0 ${Math.max(600, filtrelenmis.length * 20)} 200`}
-              style={{ width:"100%", height:"200px" }}>
-              {/* Grid çizgileri */}
-              {[0,25,50,75,100].map(y => (
-                <line key={y}
-                  x1="0" y1={y * 2}
-                  x2={Math.max(600, filtrelenmis.length * 20)} y2={y * 2}
-                  stroke="#2d3748" strokeWidth="0.5" />
-              ))}
-              {/* Alan */}
-              {filtrelenmis.length > 1 && (() => {
-                const w = Math.max(600, filtrelenmis.length * 20);
-                const aralik = maxDeger - minDeger || 1;
-                const noktalar = filtrelenmis.map((s, i) => {
-                  const x = (i / (filtrelenmis.length - 1)) * w;
-                  const y = 190 - ((s.toplamVarlik - minDeger) / aralik) * 170;
-                  return `${x},${y}`;
-                });
-                const alan = `M0,190 L${noktalar.join(" L")} L${w},190 Z`;
-                const cizgi = `M${noktalar.join(" L")}`;
-                return (
-                  <>
-                    <path d={alan} fill="#1d4ed833" />
-                    <path d={cizgi} fill="none" stroke="#3b82f6" strokeWidth="2" />
-                    {filtrelenmis.map((s, i) => {
-                      const x = (i / (filtrelenmis.length - 1)) * w;
-                      const y = 190 - ((s.toplamVarlik - minDeger) / aralik) * 170;
-                      return <circle key={i} cx={x} cy={y} r="3" fill="#3b82f6" />;
-                    })}
-                  </>
-                );
-              })()}
-            </svg>
-          </div>
-        </div>
+        <h3 className="panel-baslik">Toplam Varlık Değişimi</h3>
+        {filtrelenmis.length > 1 ? (() => {
+          const maxD = Math.max(...filtrelenmis.map(s => s.toplamVarlik));
+          const minD = Math.min(...filtrelenmis.map(s => s.toplamVarlik));
+          const aralik = maxD - minD || 1;
+          const w = 100;
+          const noktalar = filtrelenmis.map((s, i) => {
+            const x = (i / (filtrelenmis.length - 1)) * w;
+            const y = 100 - ((s.toplamVarlik - minD) / aralik) * 85;
+            return { x, y, s };
+          });
+          const cizgi = noktalar.map((p, i) => `${i===0?"M":"L"}${p.x},${p.y}`).join(" ");
+          const alan = `${cizgi} L${w},100 L0,100 Z`;
+          return (
+            <div style={{ position:"relative" }}>
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none"
+                style={{ width:"100%", height:"200px", display:"block" }}>
+                <defs>
+                  <linearGradient id="grad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.4" />
+                    <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <path d={alan} fill="url(#grad)" />
+                <path d={cizgi} fill="none" stroke="#3b82f6" strokeWidth="0.5" />
+                {noktalar.map((p, i) => (
+                  <circle key={i} cx={p.x} cy={p.y} r="1" fill="#3b82f6" />
+                ))}
+              </svg>
+              {/* Tarih etiketleri */}
+              <div style={{ display:"flex", justifyContent:"space-between", fontSize:"0.7rem", color:"#64748b", marginTop:"4px" }}>
+                <span>{new Date(filtrelenmis[0].tarih).toLocaleDateString("tr-TR",{day:"2-digit",month:"2-digit"})}</span>
+                {filtrelenmis.length > 2 && (
+                  <span>{new Date(filtrelenmis[Math.floor(filtrelenmis.length/2)].tarih).toLocaleDateString("tr-TR",{day:"2-digit",month:"2-digit"})}</span>
+                )}
+                <span>{new Date(filtrelenmis[filtrelenmis.length-1].tarih).toLocaleDateString("tr-TR",{day:"2-digit",month:"2-digit"})}</span>
+              </div>
+              {/* Min/Max değerler */}
+              <div style={{ display:"flex", justifyContent:"space-between", fontSize:"0.72rem", color:"#94a3b8", marginTop:"4px" }}>
+                <span>Min: {minD.toLocaleString("tr-TR",{maximumFractionDigits:0})} TL</span>
+                <span>Max: {maxD.toLocaleString("tr-TR",{maximumFractionDigits:0})} TL</span>
+              </div>
+            </div>
+          );
+        })() : (
+          <p style={{ color:"#64748b", fontSize:"0.85rem" }}>Grafik için en az 2 günlük veri gerekli.</p>
+        )}
       </div>
 
-      {/* Tablo */}
+      {/* Günlük Kayıtlar Tablosu */}
       <div className="panel">
         <h3 className="panel-baslik">Günlük Kayıtlar</h3>
         <div className="tablo-kap">
@@ -3198,7 +3221,6 @@ function PerformansTakibi({ snapshots }) {
     </div>
   );
 }
-
 // ─── HİSSE İŞLEM GEÇMİŞİ ─────────────────────────────────────────────────
 function HisseIslemGecmisi({ hisseId }) {
   const [islemler, setIslemler] = useState([]);
