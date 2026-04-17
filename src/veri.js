@@ -82,7 +82,10 @@ export async function takipYaz(liste) {
 export function portfoyDinle(callback) {
   const ref = doc(db, "portfoy", KULLANICI_ID);
   return onSnapshot(ref, (snap) => {
-    if (snap.exists()) callback(snap.data().hisseler);
+    if (snap.exists()) {
+      const hisseler = snap.data().hisseler;
+      if (hisseler && hisseler.length > 0) callback(hisseler);
+    }
   });
 }
 

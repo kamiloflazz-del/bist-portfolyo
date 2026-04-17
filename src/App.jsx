@@ -1454,12 +1454,6 @@ export default function App() {
     const timeout = setTimeout(() => setYukleniyor(false), 5000);
 
     async function baslat() {
-      try {
-        const mevcutVeri = await portfoyOku();
-        if (!mevcutVeri || mevcutVeri.length === 0) {
-          await portfoyYaz(BASLANGIC_PORTFOY);
-        }
-      } catch(e) { console.error("Başlangıç yazma hatası:", e); }
 
       const portfoyDur = portfoyDinle((gelenHisseler) => {
         if (gelenHisseler && gelenHisseler.length > 0) setHisseler(gelenHisseler);
@@ -1561,7 +1555,6 @@ export default function App() {
 
       setHisseler(yeniHisseler);
       portfoyYaz(yeniHisseler).catch(e => console.error("Fiyat yazma hatası:", e));
-      localStorage.setItem("bist_portfoy", JSON.stringify(yeniHisseler));
       const zaman = new Date().toLocaleString("tr-TR");
       setSonGuncelleme(zaman);
       localStorage.setItem("son_guncelleme", zaman);
@@ -1716,7 +1709,15 @@ export default function App() {
         {aktifSayfa === "halkaarzi"  && <HalkaArz />}
         {aktifSayfa === "grafikler"  && <Grafikler hisseler={hisseler} nakit={nakit} />}
         {aktifSayfa === "takvim"     && <BilancTakvim hisseler={hisseler} onGuncelle={hisseGuncelle} />}
-        {aktifSayfa === "nakit"      && <NakitYonetim nakit={nakit} onNakitGuncelle={setNakit} />}
+        {aktifSayfa === "nakit" && (
+          <NakitYonetim
+            nakit={nakit}
+            onNakitGuncelle={(yeniNakit) => {
+              setNakit(yeniNakit);
+              nakitYaz(yeniNakit).catch(e => console.error("Nakit yazma hatası:", e));
+            }}
+          />
+        )}
 
         {aktifSayfa === "arsiv" && (
           <ArsivSayfasi
