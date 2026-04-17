@@ -1809,7 +1809,7 @@ function HalkaArz() {
     const yeni = { ...form, id: Date.now() };
     const guncellenmis = [yeni, ...arzlar];
     setArzlar(guncellenmis);
-    
+    halkaArzYaz(guncellenmis).catch(e => console.error("Halka arz yazma hatası:", e));
     setForm({ ...bos });
     setFormAcik(false);
   }
@@ -1818,7 +1818,7 @@ function HalkaArz() {
     if (!window.confirm("Bu kaydı silmek istediğine emin misin?")) return;
     const guncellenmis = arzlar.filter(a => a.id !== id);
     setArzlar(guncellenmis);
-    
+    halkaArzYaz(guncellenmis).catch(e => console.error("Halka arz silme hatası:", e));
   }
 
   function durumRenk(d) {
@@ -2465,7 +2465,7 @@ function NakitYonetim({ nakit, onNakitGuncelle }) {
     if (!window.confirm("Bu işlemi silmek istediğine emin misin?")) return;
     const yeni = islemler.filter(i => i.id !== id);
     setIslemler(yeni);
-    
+    islemlerYaz(yeni).catch(e => console.error("İşlem silme hatası:", e));
   }
 
   function tipRenk(tip) {
