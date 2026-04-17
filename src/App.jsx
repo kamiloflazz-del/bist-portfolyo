@@ -479,7 +479,7 @@ function HisseListe({ hisseler, nakit, onHisseClick }) {
   const [siralama, setSiralama] = useState({ kolon: null, yon: "azalan" });
   const [kolonSecici, setKolonSecici] = useState(false);
   const [gorunenKolonlar, setGorunenKolonlar] = useState(
-    ["id","kategori","guncel","gunluk","kzYuzde","kzTutar","tutar","potansiyel","mevcutOran","hedefOran","aksiyon"]
+    ["id","kategori","adet","alis","guncel","gunluk","kzYuzde","kzTutar","tutar","potansiyel","mevcutOran","hedefOran","aksiyon"]
   );
 
   const toplamVarlik = hisseler.reduce((t, h) => t + h.guncel * h.adet, 0)
