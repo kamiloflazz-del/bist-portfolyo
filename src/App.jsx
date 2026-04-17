@@ -1560,6 +1560,7 @@ export default function App() {
       });
 
       setHisseler(yeniHisseler);
+      portfoyYaz(yeniHisseler).catch(e => console.error("Fiyat yazma hatası:", e));
       localStorage.setItem("bist_portfoy", JSON.stringify(yeniHisseler));
       const zaman = new Date().toLocaleString("tr-TR");
       setSonGuncelleme(zaman);
@@ -1731,7 +1732,11 @@ export default function App() {
         {aktifSayfa === "yeni" && (
           <HisseEkle
             onEkle={(yeniHisse) => {
-              setHisseler(prev => [...prev, yeniHisse]);
+              setHisseler(prev => {
+                const yeni = [...prev, yeniHisse];
+                portfoyYaz(yeni).catch(e => console.error("Yazma hatası:", e));
+                return yeni;
+              });
               setAktifSayfa("liste");
             }}
             onIptal={() => setAktifSayfa("liste")}
