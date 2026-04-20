@@ -49,6 +49,10 @@ export async function takipOku() {
 
 // ─── YAZMA ───────────────────────────────────────────────────────────────
 export async function portfoyYaz(hisseler) {
+  if (!hisseler || hisseler.length === 0) {
+    console.error("HATA: Boş portföy yazılmaya çalışıldı — iptal edildi");
+    return;
+  }
   const ref = doc(db, "portfoy", KULLANICI_ID);
   await setDoc(ref, { hisseler: temizle(hisseler) });
 }

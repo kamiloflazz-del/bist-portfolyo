@@ -1553,8 +1553,12 @@ export default function App() {
         return yeniTakip;
       });
 
-      setHisseler(yeniHisseler);
-      portfoyYaz(yeniHisseler).catch(e => console.error("Fiyat yazma hatası:", e));
+      if (yeniHisseler.length > 0) {
+        setHisseler(yeniHisseler);
+        portfoyYaz(yeniHisseler).catch(e => console.error("Fiyat yazma hatası:", e));
+      } else {
+        console.error("Güncelleme sonrası hisse listesi boş — yazma iptal edildi");
+      }
       const zaman = new Date().toLocaleString("tr-TR");
       setSonGuncelleme(zaman);
       localStorage.setItem("son_guncelleme", zaman);
