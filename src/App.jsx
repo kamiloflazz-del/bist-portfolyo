@@ -1433,7 +1433,9 @@ export default function App() {
   useEffect(() => {
     if (yukleniyor || hisseler.length === 0) return;
     const bugun = new Date().toISOString().split("T")[0];
-    if (snapshots[0]?.tarih === bugun) return;
+    const enYeniTarih = snapshots.reduce((en, s) => 
+      s.tarih > en ? s.tarih : en, "");
+    if (enYeniTarih === bugun) return;
     const toplamHisse  = hisseler.reduce((t, h) => t + h.guncel * h.adet, 0);
     const toplamVarlik = toplamHisse + nakit.tlNakit + nakit.usdFon;
     const yeniSnapshot = {
