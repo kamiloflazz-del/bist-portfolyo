@@ -1613,15 +1613,41 @@ export default function App() {
     setHisseler(prev => { const y = prev.filter(h => h.id !== id); portfoyYaz(y); return y; });
   }
 
-  function veriIndir() {
-    const veri = { hisseler, nakit, tarih: new Date().toISOString() };
-    const blob = new Blob([JSON.stringify(veri, null, 2)], { type:"application/json" });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement("a");
-    a.href     = url;
-    a.download = `bist-portfoy-${new Date().toLocaleDateString("tr-TR").replace(/\./g,"-")}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+  async function veriIndir() {
+    try {
+      const [notlar, islemler, takip, halkaarzi, arsivVeri, alarmlar, snapVeri] = await Promise.all([
+        notlarOku(),
+        islemlerOku(),
+        takipOku(),
+        halkaArzOku(),
+        arsivOku(),
+        alarmGecmisiOku(),
+        snapshotOku(),
+      ]);
+
+      const veri = {
+        hisseler,
+        nakit,
+        notlar,
+        islemler,
+        takip,
+        halkaarzi,
+        arsiv: arsivVeri,
+        alarmGecmisi: alarmlar,
+        snapshots: snapVeri,
+        tarih: new Date().toISOString()
+      };
+
+      const blob = new Blob([JSON.stringify(veri, null, 2)], { type:"application/json" });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href     = url;
+      a.download = `bist-portfoy-tam-yedek-${new Date().toLocaleDateString("tr-TR").replace(/\./g,"-")}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch(e) {
+      alert("Yedek alınamadı: " + e.message);
+    }
   }
 
   function veriYukleFile(e) {
