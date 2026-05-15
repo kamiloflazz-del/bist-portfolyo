@@ -25,8 +25,8 @@ import {
 const PROXY_URL = "https://bist-proxy.vercel.app";
 
 // ─── GÜVENLİK ────────────────────────────────────────────────────────────
-const SIFRE_HASH = "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918";
-// Bu hash "admin" şifresine karşılık geliyor
+const SIFRE_HASH = "88a977807fde81dd2936581ee90d91739e02c91b9fba8b77269076386561483b";
+// Bu hash "admin" şifresine karşılık geliyor BISTadmin23
 // Değiştirmek için: https://emn178.github.io/online-tools/sha256.html adresinde
 // yeni şifreni yaz, çıkan hash'i buraya yapıştır
 
@@ -1657,10 +1657,39 @@ export default function App() {
     reader.onload = async (ev) => {
       try {
         const veri = JSON.parse(ev.target.result);
-        if (veri.hisseler) { setHisseler(veri.hisseler); await portfoyYaz(veri.hisseler); }
-        if (veri.nakit)    { setNakit(veri.nakit);       await nakitYaz(veri.nakit);      }
-        alert("Veri başarıyla yüklendi ve Firebase'e kaydedildi!");
-      } catch { alert("Dosya okunamadı."); }
+
+        if (veri.hisseler && veri.hisseler.length > 0) {
+          setHisseler(veri.hisseler);
+          await portfoyYaz(veri.hisseler);
+        }
+        if (veri.nakit) {
+          setNakit(veri.nakit);
+          await nakitYaz(veri.nakit);
+        }
+        if (veri.notlar)       await notlarYaz(veri.notlar);
+        if (veri.islemler)     await islemlerYaz(veri.islemler);
+        if (veri.takip) {
+          setTakipListe(veri.takip);
+          await takipYaz(veri.takip);
+        }
+        if (veri.halkaarzi)    await halkaArzYaz(veri.halkaarzi);
+        if (veri.arsiv) {
+          setArsiv(veri.arsiv);
+          await arsivYaz(veri.arsiv);
+        }
+        if (veri.alarmGecmisi) {
+          setAlarmGecmisi(veri.alarmGecmisi);
+          await alarmGecmisiYaz(veri.alarmGecmisi);
+        }
+        if (veri.snapshots) {
+          setSnapshots(veri.snapshots);
+          await snapshotYaz(veri.snapshots);
+        }
+
+        alert("✅ Tüm veriler başarıyla yüklendi ve Firebase'e kaydedildi!");
+      } catch(e) {
+        alert("Dosya okunamadı: " + e.message);
+      }
     };
     reader.readAsText(file);
   }
